@@ -100,4 +100,4 @@ deploy.sh
 test-report.xml
 *log.txt
 
-/.firebase
+.firebase
