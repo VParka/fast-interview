@@ -1,0 +1,20 @@
+{
+  "hosting": {
+    "public": ".firebase/hosting",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+  },
+  "functions": {
+    "source": ".firebase/functions"
+  },
+  "rewrites": [
+    {
+      "source": "**",
+      "function": "nextjs16app"
+    }
+  ],
+  "emulators": {
+    "hosting": {
+      "port": 5000
+    }
+  }
+}
