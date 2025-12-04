@@ -52,6 +52,6 @@ export async function updateAndRevalidate() {
   revalidatePath('/dashboard');
 
   // 또는 특정 태그 재검증
-  revalidateTag('users');
+  // revalidateTag('users');
 }
 
