@@ -8,10 +8,7 @@ type PageProps = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default async function DashboardDetailPage({
-  params,
-  searchParams,
-}: PageProps) {
+export default async function DashboardDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   const query = await searchParams;
 
@@ -36,7 +33,7 @@ export default async function DashboardDetailPage({
 // 빌드 시 미리 페이지 생성 (SSG)
 export async function generateStaticParams() {
   // 실제로는 DB나 API에서 데이터 가져옴
-  return [{ id: '1' }, { id: '2' }, { id: '3' }];
+  return [{ id: "1" }, { id: "2" }, { id: "3" }];
 }
 
 // ============================================
@@ -49,4 +46,3 @@ export async function generateMetadata({ params }: PageProps) {
     description: `${id}번 항목의 상세 페이지`,
   };
 }
-

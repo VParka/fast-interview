@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef } from "react";
 
 // ============================================
 // 📌 AudioRecorder Component
@@ -21,9 +21,9 @@ interface TranscriptionResponse {
 
 export default function AudioRecorder() {
   const [isRecording, setIsRecording] = useState(false);
-  const [transcription, setTranscription] = useState<string>('');
+  const [transcription, setTranscription] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -31,8 +31,8 @@ export default function AudioRecorder() {
   // 녹음 시작
   const startRecording = async () => {
     try {
-      setError('');
-      setTranscription('');
+      setError("");
+      setTranscription("");
 
       // 마이크 권한 요청
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -53,7 +53,7 @@ export default function AudioRecorder() {
       mediaRecorder.onstop = async () => {
         // 오디오 Blob 생성
         const audioBlob = new Blob(audioChunksRef.current, {
-          type: 'audio/wav',
+          type: "audio/wav",
         });
 
         // 트랜스크립션 API 호출
@@ -67,12 +67,8 @@ export default function AudioRecorder() {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      console.error('Recording error:', err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : '마이크 접근 권한이 필요합니다.'
-      );
+      console.error("Recording error:", err);
+      setError(err instanceof Error ? err.message : "마이크 접근 권한이 필요합니다.");
     }
   };
 
@@ -88,15 +84,15 @@ export default function AudioRecorder() {
   const transcribeAudio = async (audioBlob: Blob) => {
     try {
       setIsProcessing(true);
-      setError('');
+      setError("");
 
       // FormData 생성
       const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.wav');
+      formData.append("audio", audioBlob, "recording.wav");
 
       // API 호출
-      const response = await fetch('/api/transcribe', {
-        method: 'POST',
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
         body: formData,
       });
 
@@ -105,11 +101,11 @@ export default function AudioRecorder() {
       if (data.success) {
         setTranscription(data.text);
       } else {
-        setError(data.error || '변환 실패');
+        setError(data.error || "변환 실패");
       }
     } catch (err) {
-      console.error('Transcription error:', err);
-      setError('서버와 통신 중 오류가 발생했습니다.');
+      console.error("Transcription error:", err);
+      setError("서버와 통신 중 오류가 발생했습니다.");
     } finally {
       setIsProcessing(false);
     }
@@ -119,11 +115,7 @@ export default function AudioRecorder() {
     <div className="audio-recorder">
       <div className="controls">
         {!isRecording ? (
-          <button
-            onClick={startRecording}
-            disabled={isProcessing}
-            className="btn-start"
-          >
+          <button onClick={startRecording} disabled={isProcessing} className="btn-start">
             🎤 녹음 시작
           </button>
         ) : (

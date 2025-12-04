@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
 // ============================================
 // 📌 /(auth)/register - 회원가입 페이지
 // ============================================
 // URL: /register (라우트 그룹이라 (auth) 미포함)
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState } from "react";
+import Link from "next/link";
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,13 +24,13 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
-      alert('비밀번호가 일치하지 않습니다');
+      alert("비밀번호가 일치하지 않습니다");
       return;
     }
 
-    const response = await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: formData.name,
         email: formData.email,
@@ -43,10 +43,7 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md"
-      >
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <h1 className="text-2xl font-bold mb-6 text-center">회원가입</h1>
 
         <div className="mb-4">
@@ -93,15 +90,12 @@ export default function RegisterPage() {
           />
         </div>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
-        >
+        <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition">
           가입하기
         </button>
 
         <p className="mt-4 text-center text-gray-600">
-          이미 계정이 있나요?{' '}
+          이미 계정이 있나요?{" "}
           <Link href="/login" className="text-blue-600 hover:underline">
             로그인
           </Link>
@@ -110,4 +104,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-

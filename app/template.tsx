@@ -13,11 +13,7 @@
 // - 페이지별 진입 로깅에 유용
 
 export default function Template({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="animate-fadeIn">
-      {children}
-    </div>
-  );
+  return <div className="animate-fadeIn">{children}</div>;
 }
 
 // globals.css에 추가 필요:
@@ -28,4 +24,3 @@ export default function Template({ children }: { children: React.ReactNode }) {
 // .animate-fadeIn {
 //   animation: fadeIn 0.3s ease-out;
 // }
-
