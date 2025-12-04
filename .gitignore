@@ -101,3 +101,6 @@ test-report.xml
 *log.txt
 
 .firebase
+
+# Transcriptions (keep directory structure but exclude content)
+/transcriptions/*.txt
