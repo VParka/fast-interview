@@ -33,17 +33,17 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. File 객체를 Buffer로 변환
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // const arrayBuffer = await audioFile.arrayBuffer();
+    // const buffer = Buffer.from(arrayBuffer);
 
     // 3. 임시 파일로 저장 (OpenAI API는 파일 경로 필요)
-    const tempDir = path.join(process.cwd(), "transcriptions");
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
+    // const tempDir = path.join(process.cwd(), "transcriptions");
+    // if (!fs.existsSync(tempDir)) {
+    //   fs.mkdirSync(tempDir, { recursive: true });
+    // }
 
-    const tempFilePath = path.join(tempDir, `temp_${Date.now()}.wav`);
-    fs.writeFileSync(tempFilePath, buffer);
+    // const tempFilePath = path.join(tempDir, `temp_${Date.now()}.wav`);
+    // fs.writeFileSync(tempFilePath, buffer);
 
     let transcriptionText: string;
 
