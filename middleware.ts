@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 // ============================================
 // 📌 middleware.ts - 미들웨어
@@ -22,11 +22,11 @@ export function middleware(request: NextRequest) {
 
   // 예시 3: 헤더 추가
   const response = NextResponse.next();
-  response.headers.set('x-custom-header', 'my-value');
+  response.headers.set("x-custom-header", "my-value");
 
   // 예시 4: 특정 경로 리다이렉트
-  if (pathname === '/old-page') {
-    return NextResponse.redirect(new URL('/new-page', request.url));
+  if (pathname === "/old-page") {
+    return NextResponse.redirect(new URL("/new-page", request.url));
   }
 
   // 예시 5: 지역화 (i18n)
@@ -45,11 +45,10 @@ export const config = {
   // 특정 경로에만 적용
   matcher: [
     // 모든 페이지 (정적 파일 제외)
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    "/((?!_next/static|_next/image|favicon.ico).*)",
 
     // 또는 특정 경로만:
     // '/dashboard/:path*',
     // '/api/:path*',
   ],
 };
-

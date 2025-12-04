@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
 // ============================================
 // 📌 /api/users/[id] - 동적 라우트
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     success: true,
     data: {
       id: parseInt(id),
-      name: '사용자 ' + id,
+      name: "사용자 " + id,
       email: `user${id}@example.com`,
     },
   });
@@ -47,4 +47,3 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     message: `사용자 ${id} 삭제 완료`,
   });
 }
-

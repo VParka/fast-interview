@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
 // ============================================
 // 📌 route.ts - API 라우트 핸들러
@@ -11,11 +11,11 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   // URL 파라미터 가져오기
   const searchParams = request.nextUrl.searchParams;
-  const query = searchParams.get('query'); // ?query=value
+  const query = searchParams.get("query"); // ?query=value
 
   return NextResponse.json({
     success: true,
-    message: 'GET 요청 성공',
+    message: "GET 요청 성공",
     query: query,
     timestamp: new Date().toISOString(),
   });
@@ -32,10 +32,7 @@ export async function POST(request: NextRequest) {
 
     // 유효성 검사
     if (!email || !password) {
-      return NextResponse.json(
-        { success: false, error: '이메일과 비밀번호를 입력하세요' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "이메일과 비밀번호를 입력하세요" }, { status: 400 });
     }
 
     // 로그인 로직 (예시)
@@ -43,14 +40,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: '로그인 성공',
+      message: "로그인 성공",
       user: { email },
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: '잘못된 요청입니다' },
-      { status: 400 }
-    );
+    return NextResponse.json({ success: false, error: "잘못된 요청입니다" }, { status: 400 });
   }
 }
 
@@ -62,7 +56,7 @@ export async function PUT(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    message: 'PUT 요청 - 전체 업데이트',
+    message: "PUT 요청 - 전체 업데이트",
     data: body,
   });
 }
@@ -75,7 +69,7 @@ export async function PATCH(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    message: 'PATCH 요청 - 부분 업데이트',
+    message: "PATCH 요청 - 부분 업데이트",
     data: body,
   });
 }
@@ -85,7 +79,7 @@ export async function PATCH(request: NextRequest) {
 // ============================================
 export async function DELETE(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const id = searchParams.get('id');
+  const id = searchParams.get("id");
 
   return NextResponse.json({
     success: true,
