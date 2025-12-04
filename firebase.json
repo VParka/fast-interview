@@ -1,7 +1,14 @@
 {
   "hosting": {
-    "public": ".firebase/hosting",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    "source": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "frameworksBackend": {
+      "region": "asia-east1"
+    }
   },
   "functions": {
     "source": ".firebase/functions"
