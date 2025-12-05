@@ -1,24 +1,13 @@
 // ============================================
-// Multi-LLM Router with Failover
+// LLM Router - OpenAI GPT-4o
 // ============================================
-// GPT-4o (Primary) + Claude 3.5 Sonnet (Fallback)
-// Supports prompt caching and cost optimization
 
 import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
 import { INTERVIEWERS, type InterviewerType, type StructuredResponse } from '@/types/interview';
 
-// Initialize clients
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-// LLM Provider Types
-export type LLMProvider = 'openai' | 'anthropic';
 
 export interface LLMRequest {
   messages: ChatMessage[];
@@ -38,10 +27,9 @@ export interface ChatMessage {
 export interface LLMResponse {
   content: string;
   structuredResponse?: StructuredResponse;
-  provider: LLMProvider;
+  provider: 'openai';
   model: string;
   latencyMs: number;
-  cached?: boolean;
 }
 
 // Structured output JSON schema
@@ -65,28 +53,13 @@ const INTERVIEW_RESPONSE_SCHEMA = {
   required: ['question', 'evaluation', 'follow_up_intent'],
 };
 
-export class MultiLLMRouter {
-  private primaryProvider: LLMProvider = 'openai';
-  private fallbackProvider: LLMProvider = 'anthropic';
-  private retryCount = 2;
-  private promptCacheEnabled = true;
-
-  // Model selection by task type
-  private modelMap = {
-    persona_response: 'gpt-4o',
-    evaluation: 'claude-3-5-sonnet-latest',
-    follow_up: 'gpt-4o',
-    summary: 'gpt-4o-mini',
-  };
-
+export class LLMRouter {
   async generateResponse(request: LLMRequest): Promise<LLMResponse> {
     const startTime = Date.now();
     const interviewer = INTERVIEWERS[request.interviewerId];
 
-    // Build system prompt with interviewer persona
     const systemPrompt = request.systemPrompt || this.buildSystemPrompt(interviewer, request.position);
 
-    // Try primary provider first
     try {
       const response = await this.callOpenAI({
         ...request,
@@ -97,22 +70,8 @@ export class MultiLLMRouter {
         latencyMs: Date.now() - startTime,
       };
     } catch (error) {
-      console.error('OpenAI call failed, trying Anthropic fallback:', error);
-
-      // Fallback to Anthropic
-      try {
-        const response = await this.callAnthropic({
-          ...request,
-          systemPrompt,
-        });
-        return {
-          ...response,
-          latencyMs: Date.now() - startTime,
-        };
-      } catch (fallbackError) {
-        console.error('Anthropic fallback also failed:', fallbackError);
-        throw new Error('All LLM providers failed');
-      }
+      console.error('OpenAI call failed:', error);
+      throw new Error('LLM request failed');
     }
   }
 
@@ -142,7 +101,6 @@ export class MultiLLMRouter {
     ];
 
     if (request.structuredOutput) {
-      // Use structured output with JSON schema
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages,
@@ -172,7 +130,6 @@ export class MultiLLMRouter {
         structuredResponse,
         provider: 'openai',
         model: 'gpt-4o',
-        cached: false,
       };
     } else {
       const completion = await openai.chat.completions.create({
@@ -186,71 +143,13 @@ export class MultiLLMRouter {
         content: completion.choices[0]?.message?.content || '',
         provider: 'openai',
         model: 'gpt-4o',
-        cached: false,
       };
     }
-  }
-
-  private async callAnthropic(request: LLMRequest & { systemPrompt: string }): Promise<Omit<LLMResponse, 'latencyMs'>> {
-    const messages: Anthropic.MessageParam[] = request.messages.map(msg => ({
-      role: msg.role === 'assistant' ? 'assistant' : 'user',
-      content: msg.content,
-    }));
-
-    // Use prompt caching for system prompt (ephemeral cache)
-    const systemContent: Anthropic.TextBlockParam[] = [
-      {
-        type: 'text',
-        text: request.systemPrompt,
-        // Note: cache_control is available in beta
-      },
-    ];
-
-    const completion = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-latest',
-      max_tokens: request.maxTokens || 300,
-      system: systemContent,
-      messages,
-    });
-
-    const textContent = completion.content.find(c => c.type === 'text');
-    const content = textContent?.type === 'text' ? textContent.text : '';
-
-    if (request.structuredOutput) {
-      // Parse structured response from Claude's output
-      try {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const structuredResponse = JSON.parse(jsonMatch[0]) as StructuredResponse;
-          return {
-            content: structuredResponse.question || content,
-            structuredResponse,
-            provider: 'anthropic',
-            model: 'claude-3-5-sonnet-latest',
-            cached: false,
-          };
-        }
-      } catch {
-        console.error('Failed to parse structured response from Claude');
-      }
-    }
-
-    return {
-      content,
-      provider: 'anthropic',
-      model: 'claude-3-5-sonnet-latest',
-      cached: false,
-    };
-  }
-
-  // Select optimal model based on task type
-  selectModel(taskType: keyof typeof this.modelMap): string {
-    return this.modelMap[taskType] || 'gpt-4o';
   }
 }
 
 // Singleton instance
-export const llmRouter = new MultiLLMRouter();
+export const llmRouter = new LLMRouter();
 
 // Utility function for simple calls
 export async function generateInterviewerResponse(

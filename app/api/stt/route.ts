@@ -1,9 +1,8 @@
 // ============================================
-// STT API - Speech-to-Text with Failover
+// STT API - OpenAI Whisper
 // ============================================
 // POST /api/stt
-// - Primary: Deepgram Nova-2
-// - Fallback: OpenAI Whisper
+// - OpenAI Whisper API for speech-to-text
 
 import { NextRequest, NextResponse } from 'next/server';
 import { transcribeAudio } from '@/lib/stt/service';
@@ -27,7 +26,7 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Transcribe with failover
+    // Transcribe with Whisper
     const result = await transcribeAudio(buffer, language);
 
     return NextResponse.json({
