@@ -4,7 +4,6 @@
 -- Run this in Supabase SQL Editor
 
 -- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- Enum Types
@@ -66,7 +65,7 @@ CREATE TRIGGER on_auth_user_created
 -- Documents Table (for RAG)
 -- ============================================
 CREATE TABLE documents (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   type document_type NOT NULL,
   filename TEXT NOT NULL,
@@ -83,7 +82,7 @@ CREATE INDEX documents_embedding_idx ON documents
 
 -- Full-text search index for BM25-style search
 ALTER TABLE documents ADD COLUMN content_tsv TSVECTOR
-  GENERATED ALWAYS AS (to_tsvector('korean', content)) STORED;
+  GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED;
 CREATE INDEX documents_content_tsv_idx ON documents USING GIN (content_tsv);
 
 -- RLS for documents
@@ -105,7 +104,7 @@ CREATE POLICY "Users can delete own documents"
 -- Interview Sessions Table
 -- ============================================
 CREATE TABLE interview_sessions (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   job_type TEXT NOT NULL,
   industry TEXT,
@@ -145,7 +144,7 @@ CREATE POLICY "Users can update own sessions"
 -- Messages Table
 -- ============================================
 CREATE TABLE messages (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   session_id UUID REFERENCES interview_sessions(id) ON DELETE CASCADE NOT NULL,
   role message_role NOT NULL,
   interviewer_id TEXT,
@@ -183,7 +182,7 @@ CREATE POLICY "Users can insert messages to own sessions"
 -- Interview Results Table
 -- ============================================
 CREATE TABLE interview_results (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   session_id UUID REFERENCES interview_sessions(id) ON DELETE CASCADE NOT NULL UNIQUE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   overall_score NUMERIC(5, 2) NOT NULL,
@@ -218,7 +217,7 @@ CREATE POLICY "System can insert results"
 -- Emotion Analyses Table
 -- ============================================
 CREATE TABLE emotion_analyses (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   result_id UUID REFERENCES interview_results(id) ON DELETE CASCADE NOT NULL UNIQUE,
   timeline JSONB NOT NULL DEFAULT '[]'::JSONB,
   average_scores JSONB NOT NULL,
@@ -240,7 +239,7 @@ CREATE POLICY "Users can view own emotion analyses"
 -- Speech Analytics Table
 -- ============================================
 CREATE TABLE speech_analytics (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   result_id UUID REFERENCES interview_results(id) ON DELETE CASCADE NOT NULL UNIQUE,
   words_per_minute NUMERIC(5, 2) NOT NULL,
   filler_words JSONB NOT NULL DEFAULT '[]'::JSONB,
@@ -264,7 +263,7 @@ CREATE POLICY "Users can view own speech analytics"
 -- Questions Bank Table
 -- ============================================
 CREATE TABLE questions (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   category TEXT NOT NULL,
   job_type TEXT,
   industry TEXT,
@@ -355,10 +354,10 @@ BEGIN
       d.id,
       d.content,
       d.metadata,
-      ts_rank_cd(d.content_tsv, plainto_tsquery('korean', query_text)) AS bm25_score,
-      ROW_NUMBER() OVER (ORDER BY ts_rank_cd(d.content_tsv, plainto_tsquery('korean', query_text)) DESC) AS bm25_rank
+      ts_rank_cd(d.content_tsv, plainto_tsquery('simple', query_text)) AS bm25_score,
+      ROW_NUMBER() OVER (ORDER BY ts_rank_cd(d.content_tsv, plainto_tsquery('simple', query_text)) DESC) AS bm25_rank
     FROM documents d
-    WHERE d.content_tsv @@ plainto_tsquery('korean', query_text)
+    WHERE d.content_tsv @@ plainto_tsquery('simple', query_text)
     LIMIT match_count * 2
   ),
   combined AS (
