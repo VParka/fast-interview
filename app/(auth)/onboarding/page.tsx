@@ -119,18 +119,20 @@ export default function OnboardingPage() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      const response = await fetch("/api/profile/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           full_name: formData.full_name,
           job_type: formData.job_type,
           industry: formData.industry,
-          updated_at: new Date().toISOString(),
-        } as Record<string, unknown>)
-        .eq("id", user.id);
+        }),
+      });
 
-      if (error) {
-        console.error("Profile update error:", error);
+      const data = await response.json();
+
+      if (!data.success) {
+        console.error("Profile update error:", data.error);
         alert("프로필 저장 중 오류가 발생했습니다.");
         return;
       }

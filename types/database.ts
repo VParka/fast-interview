@@ -52,6 +52,7 @@ export interface Database {
           industry: string | null;
           difficulty: 'easy' | 'medium' | 'hard';
           resume_doc_id: string | null;
+          portfolio_doc_id: string | null;
           company_doc_ids: string[] | null;
           status: 'waiting' | 'active' | 'paused' | 'completed';
           turn_count: number;
@@ -68,6 +69,7 @@ export interface Database {
           industry?: string | null;
           difficulty: 'easy' | 'medium' | 'hard';
           resume_doc_id?: string | null;
+          portfolio_doc_id?: string | null;
           company_doc_ids?: string[] | null;
           status?: 'waiting' | 'active' | 'paused' | 'completed';
           turn_count?: number;
@@ -82,6 +84,7 @@ export interface Database {
           industry?: string | null;
           difficulty?: 'easy' | 'medium' | 'hard';
           resume_doc_id?: string | null;
+          portfolio_doc_id?: string | null;
           company_doc_ids?: string[] | null;
           status?: 'waiting' | 'active' | 'paused' | 'completed';
           turn_count?: number;
