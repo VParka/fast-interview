@@ -46,7 +46,8 @@ class STTService {
   }
 
   private async transcribeWithWhisper(audioBuffer: Buffer, language: string): Promise<Omit<TranscriptionResult, 'durationMs'>> {
-    const file = new File([audioBuffer], 'audio.wav', { type: 'audio/wav' });
+    // Convert Buffer to Uint8Array for File constructor compatibility
+    const file = new File([new Uint8Array(audioBuffer)], 'audio.wav', { type: 'audio/wav' });
 
     const transcription = await openai.audio.transcriptions.create({
       model: 'whisper-1',
