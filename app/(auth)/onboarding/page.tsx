@@ -126,7 +126,7 @@ export default function OnboardingPage() {
           job_type: formData.job_type,
           industry: formData.industry,
           updated_at: new Date().toISOString(),
-        })
+        } as Record<string, unknown>)
         .eq("id", user.id);
 
       if (error) {
