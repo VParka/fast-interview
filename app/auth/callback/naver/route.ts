@@ -87,27 +87,17 @@ export async function GET(request: Request) {
       .single();
 
     if (existingUser) {
-      // User exists, sign them in
-      // For existing users, we need to use a different approach
-      // Since we can't directly sign in without password, we'll use admin API
-      const { data: authUser, error: signInError } = await supabase.auth.admin.getUserByEmail(
-        naverUser.email
-      );
+      // User exists, generate magic link to sign them in
+      const { data: session } = await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: naverUser.email,
+        options: {
+          redirectTo: `${origin}/dashboard`,
+        },
+      });
 
-      if (authUser) {
-        // Generate a session for the user
-        const { data: session, error: sessionError } = await supabase.auth.admin.generateLink({
-          type: 'magiclink',
-          email: naverUser.email,
-          options: {
-            redirectTo: `${origin}/dashboard`,
-          },
-        });
-
-        if (session?.properties?.hashed_token) {
-          // Redirect to the magic link
-          return NextResponse.redirect(session.properties.action_link || `${origin}/dashboard`);
-        }
+      if (session?.properties?.action_link) {
+        return NextResponse.redirect(session.properties.action_link);
       }
     } else {
       // Create new user
