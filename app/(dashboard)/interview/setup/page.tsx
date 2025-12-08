@@ -72,13 +72,15 @@ export default function InterviewSetupPage() {
         .eq("id", user.id)
         .single();
 
-      if (profile) {
-        setUserProfile(profile);
+      const profileData = profile as { job_type?: string; industry?: string } | null;
+
+      if (profileData) {
+        setUserProfile(profileData);
         // Pre-fill from profile
         setSetup(prev => ({
           ...prev,
-          jobType: profile.job_type || "",
-          industry: profile.industry || "",
+          jobType: profileData.job_type || "",
+          industry: profileData.industry || "",
         }));
       }
 
