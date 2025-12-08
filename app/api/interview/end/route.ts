@@ -80,19 +80,32 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServerClient();
 
+    // Type for session
+    interface SessionRow {
+      id: string;
+      user_id: string;
+      job_type: string;
+      difficulty: string;
+      turn_count: number;
+      status: string;
+      created_at: string;
+    }
+
     // Get session
-    const { data: session, error: sessionError } = await supabase
+    const { data: sessionData, error: sessionError } = await supabase
       .from('interview_sessions')
       .select('*')
       .eq('id', session_id)
       .single();
 
-    if (sessionError || !session) {
+    if (sessionError || !sessionData) {
       return NextResponse.json(
         { success: false, error: '세션을 찾을 수 없습니다.' },
         { status: 404 }
       );
     }
+
+    const session = sessionData as SessionRow;
 
     // Get all messages
     const { data: messages } = await supabase
