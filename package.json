@@ -9,7 +9,13 @@
     "lint": "eslint",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:link": "supabase link --project-ref whczodrinaeeemwncfze",
+    "db:push": "supabase db push --linked",
+    "db:pull": "supabase db pull --linked",
+    "db:seed": "echo '시드 데이터는 Supabase Dashboard > SQL Editor에서 supabase/seed.sql 내용을 실행하세요'",
+    "db:migrate:new": "supabase migration new",
+    "db:types": "supabase gen types typescript --linked > types/supabase.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.0",

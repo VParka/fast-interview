@@ -58,6 +58,12 @@ export class LLMRouter {
     const startTime = Date.now();
     const interviewer = INTERVIEWERS[request.interviewerId];
 
+    console.log('=== LLM Router: generateResponse ===');
+    console.log('Interviewer:', request.interviewerId);
+    console.log('Position:', request.position);
+    console.log('API Key exists:', !!process.env.OPENAI_API_KEY);
+    console.log('API Key prefix:', process.env.OPENAI_API_KEY?.substring(0, 10) + '...');
+
     const systemPrompt = request.systemPrompt || this.buildSystemPrompt(interviewer, request.position);
 
     try {
@@ -65,13 +71,22 @@ export class LLMRouter {
         ...request,
         systemPrompt,
       });
+      console.log('OpenAI call succeeded');
       return {
         ...response,
         latencyMs: Date.now() - startTime,
       };
     } catch (error) {
-      console.error('OpenAI call failed:', error);
-      throw new Error('LLM request failed');
+      console.error('=== OpenAI Call Failed ===');
+      console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && 'status' in error) {
+        console.error('HTTP Status:', (error as { status: number }).status);
+      }
+      if (error instanceof Error && 'code' in error) {
+        console.error('Error code:', (error as { code: string }).code);
+      }
+      throw new Error(`LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

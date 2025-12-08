@@ -1,9 +1,44 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Mic, Brain, BarChart3 } from "lucide-react";
 import Link from "next/link";
+
+// Voice wave component that only animates on client
+function VoiceWave() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Fixed heights for SSR, animated heights for client
+  const heights = mounted
+    ? [8, 12, 16, 10, 14]
+    : [10, 10, 10, 10, 10];
+
+  return (
+    <div className="voice-wave">
+      {heights.map((baseHeight, i) => (
+        <motion.span
+          key={i}
+          animate={mounted ? {
+            height: [baseHeight, baseHeight + 6, baseHeight, baseHeight + 4, baseHeight]
+          } : undefined}
+          transition={{
+            duration: 1.5,
+            repeat: Infinity,
+            delay: i * 0.1,
+            ease: "easeInOut"
+          }}
+          style={{ height: `${baseHeight}px` }}
+        />
+      ))}
+    </div>
+  );
+}
 
 const features = [
   { icon: Mic, label: "Real-time Voice" },
@@ -164,11 +199,7 @@ export function HeroSection() {
                         animate={{ scale: [1, 1.05, 1] }}
                         transition={{ duration: 2, repeat: Infinity }}
                       >
-                        <div className="voice-wave">
-                          {[...Array(5)].map((_, i) => (
-                            <span key={i} style={{ height: `${8 + Math.random() * 8}px` }} />
-                          ))}
-                        </div>
+                        <VoiceWave />
                       </motion.div>
                     </div>
                     <h3 className="font-semibold text-foreground text-sm sm:text-base">
