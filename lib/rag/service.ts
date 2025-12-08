@@ -288,7 +288,7 @@ class RAGService {
 
     if (error) throw error;
 
-    return (data || []).map(d => ({
+    return (data || []).map((d: { id: string; type: string; user_id: string; filename: string; content: string; embedding?: number[]; metadata?: Record<string, unknown>; created_at: string }) => ({
       id: d.id,
       type: d.type as DocumentType,
       user_id: d.user_id,
