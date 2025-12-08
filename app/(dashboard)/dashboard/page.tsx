@@ -130,26 +130,29 @@ export default function DashboardPage() {
         return;
       }
 
+      // Cast results to proper type
+      const typedResults = results as unknown as InterviewResult[];
+
       // Calculate stats
-      const totalInterviews = results.length;
+      const totalInterviews = typedResults.length;
       const averageScore =
-        results.reduce((sum, r) => sum + r.overall_score, 0) / totalInterviews;
+        typedResults.reduce((sum, r) => sum + r.overall_score, 0) / totalInterviews;
 
       // Calculate this week count
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      const thisWeekCount = results.filter(
+      const thisWeekCount = typedResults.filter(
         (r) => new Date(r.created_at) >= oneWeekAgo
       ).length;
 
       // Calculate total minutes (estimate based on turn count)
-      const totalMinutes = results.reduce((sum, r) => {
+      const totalMinutes = typedResults.reduce((sum, r) => {
         const turns = r.interview_sessions?.turn_count || 5;
         return sum + turns * 2; // ~2 minutes per turn
       }, 0);
 
       // Score history for chart
-      const history = results
+      const history = typedResults
         .slice(0, 7)
         .reverse()
         .map((r) => ({
@@ -170,7 +173,7 @@ export default function DashboardPage() {
         competencyTotals[key] = 0;
       });
 
-      results.forEach((r) => {
+      typedResults.forEach((r) => {
         if (r.competency_scores) {
           competencyKeys.forEach((key) => {
             competencyTotals[key] += r.competency_scores[key] || 0;
@@ -188,10 +191,10 @@ export default function DashboardPage() {
         averageScore: Math.round(averageScore * 10) / 10,
         totalMinutes,
         thisWeekCount,
-        scoreChange: results.length >= 2 ? results[0].overall_score - results[1].overall_score : 0,
+        scoreChange: typedResults.length >= 2 ? typedResults[0].overall_score - typedResults[1].overall_score : 0,
         interviewChange: thisWeekCount,
       });
-      setRecentResults(results.slice(0, 5));
+      setRecentResults(typedResults.slice(0, 5));
       setScoreHistory(history);
       setAvgCompetency(avgCompetencyData);
     } catch (error) {
