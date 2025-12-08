@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
     // Synthesize speech with failover
     const result = await synthesizeSpeech(text, interviewerId, { voice, speed });
 
-    // Return audio as response
-    return new NextResponse(result.audioBuffer, {
+    // Return audio as response - convert Buffer to Uint8Array for NextResponse compatibility
+    return new NextResponse(new Uint8Array(result.audioBuffer), {
       status: 200,
       headers: {
         'Content-Type': result.contentType,
