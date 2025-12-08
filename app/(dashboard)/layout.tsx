@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
@@ -10,7 +11,9 @@ import {
   Settings,
   LogOut,
   User,
+  Loader2,
 } from "lucide-react";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 const navItems = [
   { icon: LayoutDashboard, label: "대시보드", href: "/dashboard" },
@@ -19,12 +22,81 @@ const navItems = [
   { icon: Settings, label: "설정", href: "/dashboard/settings" },
 ];
 
+interface UserProfile {
+  id: string;
+  email: string;
+  full_name?: string;
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const supabase = createBrowserSupabaseClient();
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+
+      if (authUser) {
+        // Get profile data
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", authUser.id)
+          .single() as { data: { full_name?: string } | null };
+
+        setUser({
+          id: authUser.id,
+          email: authUser.email || "",
+          full_name: profile?.full_name || authUser.user_metadata?.full_name,
+        });
+      }
+    };
+
+    fetchUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_OUT") {
+          setUser(null);
+          router.push("/login");
+        } else if (session?.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", session.user.id)
+            .single() as { data: { full_name?: string } | null };
+
+          setUser({
+            id: session.user.id,
+            email: session.user.email || "",
+            full_name: profile?.full_name || session.user.user_metadata?.full_name,
+          });
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [supabase, router]);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await supabase.auth.signOut();
+      router.push("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -80,15 +152,23 @@ export default function DashboardLayout({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground truncate">
-                사용자
+                {user?.full_name || "사용자"}
               </p>
               <p className="text-xs text-muted-foreground truncate">
-                user@example.com
+                {user?.email || "로딩 중..."}
               </p>
             </div>
           </div>
-          <button className="flex items-center gap-3 w-full px-4 py-3 mt-2 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-            <LogOut className="w-5 h-5" />
+          <button
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="flex items-center gap-3 w-full px-4 py-3 mt-2 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
+          >
+            {isLoggingOut ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <LogOut className="w-5 h-5" />
+            )}
             <span className="font-medium">로그아웃</span>
           </button>
         </div>

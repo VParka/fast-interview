@@ -5,6 +5,7 @@
 // - Creates new interview session
 // - Assigns random MBTI and names to each interviewer
 // - Returns first interviewer message
+// - Includes daily usage limit enforcement
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
@@ -18,13 +19,21 @@ import {
   generateSessionInterviewerNames,
   type SessionInterviewerNames,
 } from '@/types/interview';
+import {
+  checkDailyLimit,
+  incrementDailyUsage,
+  DAILY_LIMITS,
+  sanitizeForLogging,
+  isValidUUID,
+} from '@/lib/security';
 
 export async function POST(req: NextRequest) {
   console.log('=== Interview Start API Called ===');
 
   try {
     const body = await req.json();
-    console.log('Request body:', JSON.stringify(body, null, 2));
+    // Sanitize body for logging (mask sensitive fields)
+    console.log('Request body:', JSON.stringify(sanitizeForLogging(body), null, 2));
 
     const {
       job_type,
@@ -34,6 +43,45 @@ export async function POST(req: NextRequest) {
       portfolio_doc_id,
       timer_config,
     } = body;
+
+    // ============================================
+    // Input Validation
+    // ============================================
+    if (!job_type || typeof job_type !== 'string' || job_type.length > 100) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 직무 유형입니다.' },
+        { status: 400 }
+      );
+    }
+
+    if (industry && (typeof industry !== 'string' || industry.length > 100)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 산업 유형입니다.' },
+        { status: 400 }
+      );
+    }
+
+    if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 난이도입니다.' },
+        { status: 400 }
+      );
+    }
+
+    // Validate UUIDs if provided
+    if (resume_doc_id && !isValidUUID(resume_doc_id)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 이력서 문서 ID입니다.' },
+        { status: 400 }
+      );
+    }
+
+    if (portfolio_doc_id && !isValidUUID(portfolio_doc_id)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 포트폴리오 문서 ID입니다.' },
+        { status: 400 }
+      );
+    }
 
     // Check environment variables
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -97,6 +145,57 @@ export async function POST(req: NextRequest) {
 
     console.log('User authenticated:', user.id, user.email);
     const userId = user.id;
+
+    // ============================================
+    // Daily Limit Check
+    // ============================================
+    // Get user tier from profile (default to free)
+    let userTier: 'free' | 'pro' | 'unlimited' = 'free';
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tier')
+        .eq('id', userId)
+        .single();
+
+      if (profile?.tier && ['free', 'pro', 'unlimited'].includes(profile.tier)) {
+        userTier = profile.tier as 'free' | 'pro' | 'unlimited';
+      }
+    } catch {
+      // Profile might not have tier field, use default
+    }
+
+    const dailyLimit = DAILY_LIMITS.interviews[userTier];
+    const dailyLimitResult = await checkDailyLimit(userId, {
+      maxPerDay: dailyLimit,
+      resource: 'interviews',
+    });
+
+    if (!dailyLimitResult.success) {
+      console.log(`Daily limit reached for user ${userId}: ${dailyLimitResult.used}/${dailyLimitResult.limit}`);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `일일 면접 한도에 도달했습니다. (${dailyLimitResult.limit}회/일)`,
+          dailyLimit: {
+            limit: dailyLimitResult.limit,
+            used: dailyLimitResult.used,
+            remaining: dailyLimitResult.remaining,
+            resetsAt: dailyLimitResult.resetsAt,
+          },
+        },
+        {
+          status: 429,
+          headers: {
+            'X-DailyLimit-Limit': dailyLimitResult.limit.toString(),
+            'X-DailyLimit-Remaining': dailyLimitResult.remaining.toString(),
+            'X-DailyLimit-Reset': dailyLimitResult.resetsAt,
+          },
+        }
+      );
+    }
+
+    console.log(`Daily limit check passed: ${dailyLimitResult.used}/${dailyLimitResult.limit}`);
 
     // Assign random MBTI to each interviewer for this session
     const interviewerMbti: Record<InterviewerType, MBTIType> = {
@@ -166,6 +265,12 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('Session created:', session.id);
+
+    // ============================================
+    // Increment Daily Usage (after successful session creation)
+    // ============================================
+    await incrementDailyUsage(userId, 'interviews');
+    console.log('Daily usage incremented');
 
     // Get resume and portfolio context if available
     let resumeContext = '';
@@ -279,6 +384,9 @@ export async function POST(req: NextRequest) {
       console.error('Message save error:', messageError);
     }
 
+    // Calculate remaining daily limit
+    const newDailyUsed = dailyLimitResult.used + 1;
+
     return NextResponse.json({
       success: true,
       session: {
@@ -313,6 +421,19 @@ export async function POST(req: NextRequest) {
       },
       // All interviewer names for client display
       interviewer_names: interviewerNames,
+      // Daily usage info for client
+      dailyUsage: {
+        limit: dailyLimitResult.limit,
+        used: newDailyUsed,
+        remaining: Math.max(0, dailyLimitResult.limit - newDailyUsed),
+        resetsAt: dailyLimitResult.resetsAt,
+      },
+    }, {
+      headers: {
+        'X-DailyLimit-Limit': dailyLimitResult.limit.toString(),
+        'X-DailyLimit-Remaining': Math.max(0, dailyLimitResult.limit - newDailyUsed).toString(),
+        'X-DailyLimit-Reset': dailyLimitResult.resetsAt,
+      },
     });
   } catch (error) {
     console.error('=== Interview Start Error ===');
@@ -324,7 +445,9 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         error: '면접 시작 중 오류가 발생했습니다.',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: process.env.NODE_ENV === 'development'
+          ? (error instanceof Error ? error.message : 'Unknown error')
+          : undefined,
       },
       { status: 500 }
     );

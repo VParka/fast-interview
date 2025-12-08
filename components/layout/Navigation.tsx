@@ -103,18 +103,18 @@ export function Navigation() {
             : "bg-transparent py-6"
         }`}
       >
-        <div className="container mx-auto px-6 flex items-center justify-between">
+        <div className="container mx-auto px-4 sm:px-6 flex items-center justify-between">
           {/* Logo */}
           <motion.a
             href="#"
-            className="flex items-center gap-3 group"
+            className="flex items-center gap-2 sm:gap-3 group touch-target"
             whileHover={{ scale: 1.02 }}
           >
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-mint to-soft-blue flex items-center justify-center shadow-mint">
-              <span className="font-display font-bold text-navy text-lg">IM</span>
-              <div className="absolute inset-0 rounded-xl bg-mint/30 blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-mint to-soft-blue flex items-center justify-center shadow-mint">
+              <span className="font-display font-bold text-navy text-base sm:text-lg">IM</span>
+              <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-mint/30 blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <span className="font-display font-semibold text-xl text-foreground">
+            <span className="font-display font-semibold text-lg sm:text-xl text-foreground">
               IMSAM
             </span>
           </motion.a>
@@ -192,12 +192,13 @@ export function Navigation() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-secondary/50 transition-colors"
+            className="lg:hidden p-2 rounded-lg hover:bg-secondary/50 transition-colors touch-target"
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
           >
             {isMobileMenuOpen ? (
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5 sm:w-6 sm:h-6" />
             ) : (
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
             )}
           </button>
         </div>
@@ -206,63 +207,77 @@ export function Navigation() {
       {/* Mobile Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-x-0 top-20 z-40 lg:hidden"
-          >
-            <div className="mx-4 glass-card rounded-2xl p-6">
-              <nav className="flex flex-col gap-2">
-                {navItems.map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="px-4 py-3 text-base font-medium text-foreground hover:bg-secondary/50 rounded-lg transition-colors"
-                  >
-                    {item.label}
-                  </a>
-                ))}
-                <div className="border-t border-border my-2" />
-                {user ? (
-                  <>
-                    <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button variant="outline" className="w-full mb-2">
-                        대시보드
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="destructive"
-                      className="w-full"
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        handleLogout();
-                      }}
-                      disabled={isLoggingOut}
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 lg:hidden"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+
+            {/* Menu */}
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="fixed inset-x-0 top-16 sm:top-20 z-40 lg:hidden safe-top"
+            >
+              <div className="mx-3 sm:mx-4 glass-card rounded-2xl p-4 sm:p-6 max-h-[calc(100vh-5rem)] overflow-y-auto scrollbar-thin">
+                <nav className="flex flex-col gap-1 sm:gap-2">
+                  {navItems.map((item) => (
+                    <a
+                      key={item.label}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="px-4 py-3 text-base font-medium text-foreground hover:bg-secondary/50 rounded-lg transition-colors touch-target"
                     >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button variant="outline" className="w-full mb-2">
-                        로그인
+                      {item.label}
+                    </a>
+                  ))}
+                  <div className="border-t border-border my-2" />
+                  {user ? (
+                    <>
+                      <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
+                        <Button variant="outline" size="lg" className="w-full mb-2">
+                          대시보드
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="destructive"
+                        size="lg"
+                        className="w-full"
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          handleLogout();
+                        }}
+                        disabled={isLoggingOut}
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
                       </Button>
-                    </Link>
-                    <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button variant="mint" className="w-full">
-                        시작하기
-                      </Button>
-                    </Link>
-                  </>
-                )}
-              </nav>
-            </div>
-          </motion.div>
+                    </>
+                  ) : (
+                    <>
+                      <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                        <Button variant="outline" size="lg" className="w-full mb-2">
+                          로그인
+                        </Button>
+                      </Link>
+                      <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
+                        <Button variant="mint" size="lg" className="w-full">
+                          시작하기
+                        </Button>
+                      </Link>
+                    </>
+                  )}
+                </nav>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </>

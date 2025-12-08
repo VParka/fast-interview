@@ -224,53 +224,53 @@ export default function InterviewSetupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background py-12 px-4">
+    <div className="min-h-screen bg-background py-8 sm:py-12 px-4 safe-bottom">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-8 sm:mb-12"
         >
-          <h1 className="font-display text-3xl font-bold text-foreground mb-4">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground mb-3 sm:mb-4">
             면접 설정
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground px-4">
             맞춤형 AI 면접을 위해 정보를 입력해주세요
           </p>
         </motion.div>
 
         {/* Setup Cards */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Job Type Selection */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-mint/20 flex items-center justify-center">
-                  <Briefcase className="w-5 h-5 text-mint" />
+            <Card className="p-4 sm:p-6">
+              <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-mint/20 flex items-center justify-center flex-shrink-0">
+                  <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-mint" />
                 </div>
-                <div>
-                  <h2 className="font-medium text-foreground">직무 선택</h2>
-                  <p className="text-sm text-muted-foreground">
+                <div className="min-w-0">
+                  <h2 className="font-medium text-sm sm:text-base text-foreground">직무 선택</h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     지원하는 직무를 선택하세요
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                 {JOB_TYPES.map((job) => (
                   <button
                     key={job.value}
                     onClick={() =>
                       setSetup((prev) => ({ ...prev, jobType: job.value }))
                     }
-                    className={`p-3 rounded-xl text-sm transition-all ${
+                    className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all touch-target ${
                       setup.jobType === job.value
                         ? "bg-mint text-navy font-medium"
-                        : "bg-secondary/50 text-foreground hover:bg-secondary"
+                        : "bg-secondary/50 text-foreground hover:bg-secondary active:scale-95"
                     }`}
                   >
                     {job.label}
@@ -298,7 +298,7 @@ export default function InterviewSetupPage() {
                   </p>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                 {INDUSTRIES.map((industry) => (
                   <button
                     key={industry.value}
@@ -309,10 +309,10 @@ export default function InterviewSetupPage() {
                           prev.industry === industry.value ? "" : industry.value,
                       }))
                     }
-                    className={`p-3 rounded-xl text-sm transition-all ${
+                    className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl text-xs sm:text-sm transition-all touch-target ${
                       setup.industry === industry.value
                         ? "bg-soft-blue text-navy font-medium"
-                        : "bg-secondary/50 text-foreground hover:bg-secondary"
+                        : "bg-secondary/50 text-foreground hover:bg-secondary active:scale-95"
                     }`}
                   >
                     {industry.label}

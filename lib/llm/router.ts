@@ -55,7 +55,7 @@ export interface LLMResponse {
   latencyMs: number;
 }
 
-// Structured output JSON schema
+// Structured output JSON schema (OpenAI requires additionalProperties: false)
 const INTERVIEW_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -68,12 +68,14 @@ const INTERVIEW_RESPONSE_SCHEMA = {
         depth: { type: 'number', description: '답변 깊이 (0-100)' },
       },
       required: ['relevance', 'clarity', 'depth'],
+      additionalProperties: false,
     },
     inner_thought: { type: 'string', description: '면접관의 속마음 (1-2문장)' },
     follow_up_intent: { type: 'boolean', description: '꼬리질문 의도 여부' },
     suggested_follow_up: { type: 'string', description: '다음 꼬리질문 제안' },
   },
-  required: ['question', 'evaluation', 'follow_up_intent'],
+  required: ['question', 'evaluation', 'follow_up_intent', 'inner_thought', 'suggested_follow_up'],
+  additionalProperties: false,
 };
 
 export class LLMRouter {

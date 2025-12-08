@@ -6,6 +6,8 @@
 import OpenAI from 'openai';
 import { createServerClient } from '@/lib/supabase/client';
 import type { Document, DocumentType } from '@/types/interview';
+import { chunkKoreanDocument, type Chunk } from './chunking';
+import { retrievalMonitor } from './evaluation';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -39,7 +41,7 @@ class RAGService {
     return response.data[0].embedding;
   }
 
-  // Upload and embed document
+  // Upload and embed document with intelligent chunking
   async uploadDocument(
     userId: string,
     type: DocumentType,
@@ -50,34 +52,89 @@ class RAGService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = createServerClient() as any;
 
-    // Generate embedding
-    const embedding = await this.generateEmbedding(content);
+    // Use intelligent chunking for better retrieval quality
+    const chunks = chunkKoreanDocument(content, { type, filename });
 
-    // Store document
+    console.log(`Document chunked into ${chunks.length} pieces`);
+
+    // If single chunk, store as before
+    if (chunks.length === 1) {
+      const embedding = await this.generateEmbedding(content);
+
+      const { data, error } = await supabase
+        .from('documents')
+        .insert({
+          user_id: userId,
+          type,
+          filename,
+          content,
+          embedding,
+          metadata: { ...metadata, chunk_count: 1 },
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        type: data.type as DocumentType,
+        user_id: data.user_id,
+        filename: data.filename,
+        content: data.content,
+        embedding: data.embedding as number[] | undefined,
+        metadata: data.metadata as Record<string, unknown>,
+        created_at: data.created_at,
+      };
+    }
+
+    // Multiple chunks: generate embeddings in parallel for speed
+    const embeddingPromises = chunks.map(chunk =>
+      this.generateEmbedding(chunk.content)
+    );
+    const embeddings = await Promise.all(embeddingPromises);
+
+    // Store all chunks with parent document reference
+    const parentDocId = `${userId}_${Date.now()}`;
+    const chunksToInsert = chunks.map((chunk, idx) => ({
+      user_id: userId,
+      type,
+      filename,
+      content: chunk.content,
+      embedding: embeddings[idx],
+      metadata: {
+        ...metadata,
+        parent_doc_id: parentDocId,
+        chunk_index: chunk.metadata.chunkIndex,
+        total_chunks: chunk.metadata.totalChunks,
+        section: chunk.metadata.section,
+        chunk_type: chunk.metadata.chunkType,
+        char_count: chunk.metadata.charCount,
+        token_estimate: chunk.metadata.tokenEstimate,
+      },
+    }));
+
     const { data, error } = await supabase
       .from('documents')
-      .insert({
-        user_id: userId,
-        type,
-        filename,
-        content,
-        embedding,
-        metadata,
-      })
-      .select()
-      .single();
+      .insert(chunksToInsert)
+      .select();
 
     if (error) throw error;
 
+    // Return the first chunk as representative document
+    const firstChunk = data[0];
     return {
-      id: data.id,
-      type: data.type as DocumentType,
-      user_id: data.user_id,
-      filename: data.filename,
-      content: data.content,
-      embedding: data.embedding as number[] | undefined,
-      metadata: data.metadata as Record<string, unknown>,
-      created_at: data.created_at,
+      id: firstChunk.id,
+      type: firstChunk.type as DocumentType,
+      user_id: firstChunk.user_id,
+      filename: firstChunk.filename,
+      content: firstChunk.content,
+      embedding: firstChunk.embedding as number[] | undefined,
+      metadata: {
+        ...firstChunk.metadata,
+        all_chunk_ids: data.map((d: { id: string }) => d.id),
+      } as Record<string, unknown>,
+      created_at: firstChunk.created_at,
     };
   }
 
@@ -130,7 +187,7 @@ class RAGService {
     }
 
     // Convert to RAGSearchResult format
-    return filteredResults.slice(0, topK).map((r: { id: string; content: string; metadata: Record<string, unknown>; combined_score?: number; relevance_score?: number }) => ({
+    const mappedResults = filteredResults.slice(0, topK).map((r: { id: string; content: string; metadata: Record<string, unknown>; combined_score?: number; relevance_score?: number }) => ({
       document: {
         id: r.id,
         type: (r.metadata?.type as DocumentType) || 'resume',
@@ -143,6 +200,15 @@ class RAGService {
       score: r.combined_score || r.relevance_score || 0,
       highlights: this.extractHighlights(r.content, query),
     }));
+
+    // Log retrieval for monitoring
+    retrievalMonitor.log(
+      query,
+      mappedResults.map((r: RAGSearchResult) => r.score),
+      { vectorWeight, bm25Weight, useReranker, topK }
+    );
+
+    return mappedResults;
   }
 
   // Vector-only search fallback

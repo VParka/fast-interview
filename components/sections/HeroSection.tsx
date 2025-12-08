@@ -73,20 +73,20 @@ export function HeroSection() {
         <div className="absolute inset-0 bg-[linear-gradient(hsl(var(--border)/0.3)_1px,transparent_1px),linear-gradient(90deg,hsl(var(--border)/0.3)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,black_40%,transparent_100%)]" />
       </div>
 
-      <div className="container relative mx-auto px-6">
+      <div className="container relative mx-auto px-4 sm:px-6">
         <div className="max-w-5xl mx-auto text-center">
           {/* Badge */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card mb-8"
+            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full glass-card mb-6 sm:mb-8"
           >
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-mint opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-mint" />
             </span>
-            <span className="text-sm font-medium text-muted-foreground">
+            <span className="text-xs sm:text-sm font-medium text-muted-foreground">
               AI-Powered Interview System
             </span>
           </motion.div>
@@ -96,7 +96,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.1 }}
-            className="font-display text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tight mb-6"
+            className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tight mb-4 sm:mb-6 px-2"
           >
             <span className="text-foreground">AI Multi-Interviewer</span>
             <br />
@@ -108,7 +108,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 text-balance"
+            className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 sm:mb-10 text-balance px-4"
           >
             3인의 AI 면접관이 실시간 음성으로 다각도 역량을 평가합니다.
             <br className="hidden sm:block" />
@@ -120,7 +120,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.3 }}
-            className="flex flex-wrap justify-center gap-4 mb-12"
+            className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-4 mb-8 sm:mb-12 px-4"
           >
             {features.map((feature, index) => (
               <motion.div
@@ -128,10 +128,10 @@ export function HeroSection() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 backdrop-blur-sm border border-border/50"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-secondary/50 backdrop-blur-sm border border-border/50 touch-target"
               >
-                <feature.icon className="w-4 h-4 text-mint" />
-                <span className="text-sm font-medium text-foreground">
+                <feature.icon className="w-3 h-3 sm:w-4 sm:h-4 text-mint flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-foreground whitespace-nowrap">
                   {feature.label}
                 </span>
               </motion.div>
@@ -143,16 +143,16 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.5 }}
-            className="flex flex-col sm:flex-row justify-center gap-4"
+            className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4"
           >
-            <Link href="/interview">
-              <Button variant="hero" size="xl" className="group">
-                <Play className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
+            <Link href="/interview" className="w-full sm:w-auto">
+              <Button variant="hero" size="xl" className="group w-full sm:w-auto">
+                <Play className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
                 Try Demo
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
-            <Button variant="hero-outline" size="xl">
+            <Button variant="hero-outline" size="xl" className="w-full sm:w-auto">
               View Case Study
             </Button>
           </motion.div>
@@ -163,16 +163,16 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 60 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.7 }}
-          className="mt-20 relative"
+          className="mt-12 sm:mt-16 md:mt-20 relative"
         >
           <div className="relative max-w-4xl mx-auto">
             {/* Glass Container */}
-            <div className="glass-card rounded-3xl p-8 relative overflow-hidden">
+            <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 relative overflow-hidden">
               {/* Glow Effect */}
               <div className="absolute inset-0 bg-gradient-to-t from-mint/5 to-transparent" />
 
               {/* Avatar Grid */}
-              <div className="relative grid grid-cols-3 gap-6">
+              <div className="relative grid grid-cols-3 gap-3 sm:gap-4 md:gap-6">
                 {[
                   { name: "실무팀장", role: "Technical Lead", delay: 0 },
                   { name: "HR 담당자", role: "HR Manager", delay: 0.2 },
@@ -185,27 +185,27 @@ export function HeroSection() {
                     transition={{ duration: 0.6, delay: 1 + avatar.delay }}
                     className="flex flex-col items-center"
                   >
-                    <div className="relative mb-4">
-                      <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-br from-mint/20 to-soft-blue/20 border border-border/50 flex items-center justify-center">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gradient-to-br from-secondary to-muted flex items-center justify-center">
-                          <span className="text-3xl sm:text-4xl">
+                    <div className="relative mb-3 sm:mb-4">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-28 md:h-28 rounded-xl sm:rounded-2xl bg-gradient-to-br from-mint/20 to-soft-blue/20 border border-border/50 flex items-center justify-center">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-lg sm:rounded-xl bg-gradient-to-br from-secondary to-muted flex items-center justify-center">
+                          <span className="text-2xl sm:text-3xl md:text-4xl">
                             {index === 0 ? "👨‍💼" : index === 1 ? "👩‍💻" : "👨‍🔬"}
                           </span>
                         </div>
                       </div>
                       {/* Voice Indicator */}
                       <motion.div
-                        className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-mint/20 border border-mint/30"
+                        className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-mint/20 border border-mint/30"
                         animate={{ scale: [1, 1.05, 1] }}
                         transition={{ duration: 2, repeat: Infinity }}
                       >
                         <VoiceWave />
                       </motion.div>
                     </div>
-                    <h3 className="font-semibold text-foreground text-sm sm:text-base">
+                    <h3 className="font-semibold text-foreground text-xs sm:text-sm md:text-base text-center px-1">
                       {avatar.name}
                     </h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground text-center">
                       {avatar.role}
                     </p>
                   </motion.div>
@@ -217,14 +217,14 @@ export function HeroSection() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 1.8 }}
-                className="mt-8 flex justify-center"
+                className="mt-6 sm:mt-8 flex justify-center"
               >
-                <div className="glass px-6 py-3 rounded-2xl inline-flex items-center gap-3">
+                <div className="glass px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl inline-flex items-center gap-2 sm:gap-3">
                   <div className="flex gap-1">
                     {[0, 1, 2].map((i) => (
                       <motion.span
                         key={i}
-                        className="w-2 h-2 bg-mint rounded-full"
+                        className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-mint rounded-full"
                         animate={{ opacity: [0.4, 1, 0.4] }}
                         transition={{
                           duration: 1.2,
@@ -234,7 +234,7 @@ export function HeroSection() {
                       />
                     ))}
                   </div>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-xs sm:text-sm text-muted-foreground">
                     AI가 질문을 준비하고 있습니다...
                   </span>
                 </div>

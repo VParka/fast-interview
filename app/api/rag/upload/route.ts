@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { uploadDocument } from '@/lib/rag/service';
+import { smartParsePDF } from '@/lib/rag/pdf-parser';
 import type { DocumentType } from '@/types/interview';
 
 export async function POST(req: NextRequest) {
@@ -90,22 +91,31 @@ export async function POST(req: NextRequest) {
 
     // Extract text content from file
     let content = '';
+    let parseMetadata: Record<string, unknown> = {};
 
     if (file.type === 'text/plain') {
       content = await file.text();
     } else if (file.type === 'application/pdf') {
-      // For PDF, we'd use a PDF parser like pdf-parse
-      // For now, read as text (in production, use proper PDF parser)
+      // Use LlamaParse for complex PDFs, basic extraction for simple ones
       const arrayBuffer = await file.arrayBuffer();
-      content = Buffer.from(arrayBuffer).toString('utf-8');
+      const pdfBuffer = Buffer.from(arrayBuffer);
 
-      // TODO: Integrate LlamaParse or pdf-parse for proper PDF parsing
-      // const pdfParse = require('pdf-parse');
-      // const pdfData = await pdfParse(Buffer.from(arrayBuffer));
-      // content = pdfData.text;
+      console.log('[Upload] Parsing PDF with smart parser...');
+      const parseResult = await smartParsePDF(pdfBuffer, process.env.LLAMAPARSE_API_KEY);
+
+      content = parseResult.text;
+      parseMetadata = {
+        pdf_pages: parseResult.metadata.pages,
+        pdf_has_images: parseResult.metadata.hasImages,
+        pdf_has_tables: parseResult.metadata.hasTables,
+        pdf_parse_method: parseResult.metadata.parseMethod,
+        pdf_parse_time_ms: parseResult.metadata.parseTimeMs,
+      };
+
+      console.log(`[Upload] PDF parsed: ${parseResult.metadata.pages} pages, method: ${parseResult.metadata.parseMethod}`);
     } else {
       // For DOC/DOCX, extract text
-      // TODO: Use mammoth or docx library
+      // TODO: Use mammoth or docx library for better extraction
       content = await file.text();
     }
 
@@ -135,6 +145,7 @@ export async function POST(req: NextRequest) {
     // Add file info to metadata
     metadata = {
       ...metadata,
+      ...parseMetadata,
       filename: file.name,
       fileType: file.type,
       fileSize: file.size,
