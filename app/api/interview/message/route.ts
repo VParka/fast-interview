@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import * as Sentry from '@sentry/nextjs';
 import { generateInterviewerResponse, type ChatMessage, type UserKeyword } from '@/lib/llm/router';
 import { ragService } from '@/lib/rag/service';
 import { INTERVIEWER_BASE, type InterviewerType, type MBTIType } from '@/types/interview';
@@ -336,17 +337,22 @@ export async function POST(req: NextRequest) {
       total_latency_ms: Date.now() - startTime,
     });
   } catch (error) {
-    console.error('=== Interview Message API: ERROR ===');
-    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
-    console.error('Error message:', error instanceof Error ? error.message : String(error));
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    console.error('Total time before error:', Date.now() - startTime, 'ms');
-
+    console.error('Error in interview message API:', error);
+    
+    // Capture error in Sentry
+    Sentry.captureException(error, {
+      tags: {
+        api: 'interview-message',
+      },
+    });
+    
     return NextResponse.json(
       {
         success: false,
-        error: '메시지 처리 중 오류가 발생했습니다.',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        error:
+          error instanceof Error
+            ? error.message
+            : '메시지 처리 중 오류가 발생했습니다.',
       },
       { status: 500 }
     );
