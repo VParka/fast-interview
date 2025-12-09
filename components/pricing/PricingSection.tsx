@@ -148,9 +148,9 @@ export function PricingSection() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-8"
           >
-            <PlanSwitcher 
-              billingCycle={billingCycle} 
-              onBillingCycleChange={setBillingCycle} 
+            <PlanSwitcher
+              isAnnual={billingCycle === "annual"}
+              onToggle={(checked) => setBillingCycle(checked ? "annual" : "monthly")}
             />
           </motion.div>
         </div>
