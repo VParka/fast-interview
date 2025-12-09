@@ -71,6 +71,7 @@ export default function InterviewPage() {
 
   // Guide overlay state - shows BEFORE interview starts
   const [showStartGuide, setShowStartGuide] = useState(false);
+  const [guideCountdown, setGuideCountdown] = useState(5);
 
   // Interviewer names from DB (random per session)
   const [interviewerNames, setInterviewerNames] = useState<SessionInterviewerNames>({
@@ -382,14 +383,23 @@ export default function InterviewPage() {
     }
   };
 
-  // Show guide overlay first, then start interview
+  // Show guide overlay first, then start interview with countdown
   const handleStartClick = () => {
     setShowStartGuide(true);
-    // Auto-dismiss guide after 5 seconds and start interview
-    setTimeout(() => {
-      setShowStartGuide(false);
-      startInterview();
-    }, 5000);
+    setGuideCountdown(5);
+
+    // Countdown from 5 to 1, then start interview
+    let count = 5;
+    const countdownInterval = setInterval(() => {
+      count--;
+      setGuideCountdown(count);
+
+      if (count <= 0) {
+        clearInterval(countdownInterval);
+        setShowStartGuide(false);
+        startInterview();
+      }
+    }, 1000);
   };
 
   const startInterview = async () => {
@@ -678,7 +688,10 @@ export default function InterviewPage() {
                   <p className="text-foreground">약 30초-1분 분량으로 답변해주세요</p>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground">5초 후 면접이 시작됩니다...</p>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-3xl font-bold text-mint">{guideCountdown}</span>
+                <span className="text-sm text-muted-foreground">초 후 면접이 시작됩니다</span>
+              </div>
             </motion.div>
           </motion.div>
         )}
