@@ -3,8 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/types/database';
 
-export async function POST(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const cookieStore = await cookies();
+  
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -19,7 +20,9 @@ export async function POST(req: NextRequest) {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Server Component context
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
           }
         },
       },
@@ -32,37 +35,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { amount, reason, meta } = body;
+  const userId = authData.user.id;
 
-  const validAmount = Number(amount);
-  if (!validAmount || validAmount <= 0) {
-    return NextResponse.json({ ok: false, error: 'Invalid amount' }, { status: 400 });
-  }
+  // Ensure account row exists (initialize with 10,000 credits if new)
+  await supabase
+    .from('credits')
+    .upsert(
+      { 
+        user_id: userId, 
+        current_credits: 10000, 
+        total_earned: 10000 
+      }, 
+      { onConflict: 'user_id', ignoreDuplicates: true }
+    );
 
-  // RPC 호출
-  const { data, error } = await supabase.rpc('use_credit', {
-    p_user_id: authData.user.id,
-    p_amount: validAmount,
-    p_reason: reason || 'API Usage',
-    p_meta: meta || {},
-  });
+  const { data, error } = await supabase
+    .from('credits')
+    .select('current_credits, total_earned, total_used, updated_at')
+    .eq('user_id', userId)
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
-  if (!data?.success) {
-    const isInsufficient = data?.error === 'insufficient_funds';
-    return NextResponse.json(
-      { ok: false, error: data?.error },
-      { status: isInsufficient ? 402 : 409 }
-    );
-  }
-
   return NextResponse.json({
     ok: true,
-    balance: data.balance,
-    transactionId: data.transaction_id,
+    balance: data?.current_credits ?? 0,
+    totalEarned: data?.total_earned ?? 0,
+    totalUsed: data?.total_used ?? 0,
+    updatedAt: data?.updated_at ?? null,
   });
 }

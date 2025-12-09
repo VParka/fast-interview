@@ -1,14 +1,11 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import type { Database } from '@/types/database';
 
-const REFERRAL_SELF_AMOUNT = Number(process.env.REFERRAL_SELF_AMOUNT ?? 20);
-const REFERRAL_REFERRER_AMOUNT = Number(process.env.REFERRAL_REFERRER_AMOUNT ?? 30);
-
-function createSupabaseServerClient() {
-  const cookieStore = cookies();
-
-  return createServerClient(
+export async function POST(req: NextRequest) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -16,52 +13,50 @@ function createSupabaseServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+        setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Server Component context
+          }
         },
       },
     }
   );
-}
 
-export async function POST(req: NextRequest) {
-  const supabase = createSupabaseServerClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authData?.user) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { referralCode } = await req.json().catch(() => ({}));
-  if (!referralCode || typeof referralCode !== 'string') {
-    return NextResponse.json({ ok: false, error: '유효하지 않은 추천 코드' }, { status: 400 });
+  const body = await req.json();
+  const { code } = body;
+
+  if (!code || typeof code !== 'string') {
+    return NextResponse.json({ ok: false, error: 'Referral code is required' }, { status: 400 });
   }
 
-  const normalizedCode = referralCode.trim().toUpperCase();
-
-  const { data, error } = await supabase.rpc('award_referral', {
-    p_referral_code: normalizedCode,
-    p_friend_user_id: authData.user.id,
-    p_self_amount: REFERRAL_SELF_AMOUNT,
-    p_referrer_amount: REFERRAL_REFERRER_AMOUNT,
+  // 본인 코드 입력 방지 등은 RPC 내부에서 처리하거나 여기서 체크
+  // 여기서는 RPC를 호출한다고 가정 (apply_referral)
+  const { data, error } = await supabase.rpc('apply_referral', {
+    p_user_id: authData.user.id,
+    p_code: code,
   });
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
-  const success = Boolean(data?.success);
-  const status = success ? 200 : 409;
+  if (!data?.success) {
+    return NextResponse.json({ ok: false, error: data?.error }, { status: 400 });
+  }
 
-  return NextResponse.json(
-    {
-      ok: success,
-      error: data?.error,
-      referrerId: data?.referrer_id,
-      friendBalance: data?.friend_balance,
-      referrerBalance: data?.referrer_balance,
-    },
-    { status }
-  );
+  return NextResponse.json({
+    ok: true,
+    reward: data.reward,
+    balance: data.balance,
+  });
 }
-

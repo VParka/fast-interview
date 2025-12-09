@@ -13,6 +13,7 @@ import {
   User,
   Loader2,
   History,
+  Wallet,
 } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
@@ -21,6 +22,7 @@ const navItems = [
   { icon: Mic, label: "면접 시작", href: "/interview" },
   { icon: History, label: "면접 기록", href: "/dashboard/history" },
   { icon: BarChart3, label: "분석 리포트", href: "/dashboard/reports" },
+  { icon: Wallet, label: "크레딧", href: "/dashboard/credits" },
   { icon: Settings, label: "설정", href: "/dashboard/settings" },
 ];
 

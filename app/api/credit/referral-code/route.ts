@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/types/database';
 
-export async function POST(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const cookieStore = await cookies();
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,37 +32,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { amount, reason, meta } = body;
+  const userId = authData.user.id;
 
-  const validAmount = Number(amount);
-  if (!validAmount || validAmount <= 0) {
-    return NextResponse.json({ ok: false, error: 'Invalid amount' }, { status: 400 });
-  }
+  // 보장 및 조회
+  await supabase.rpc('ensure_referral_profile', { p_user_id: userId });
 
-  // RPC 호출
-  const { data, error } = await supabase.rpc('use_credit', {
-    p_user_id: authData.user.id,
-    p_amount: validAmount,
-    p_reason: reason || 'API Usage',
-    p_meta: meta || {},
-  });
+  const { data, error } = await supabase
+    .from('referral')
+    .select('referral_code')
+    .eq('user_id', userId)
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
-  if (!data?.success) {
-    const isInsufficient = data?.error === 'insufficient_funds';
-    return NextResponse.json(
-      { ok: false, error: data?.error },
-      { status: isInsufficient ? 402 : 409 }
-    );
-  }
-
   return NextResponse.json({
     ok: true,
-    balance: data.balance,
-    transactionId: data.transaction_id,
+    referralCode: data?.referral_code ?? null,
   });
 }

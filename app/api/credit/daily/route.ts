@@ -1,14 +1,14 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import type { Database } from '@/types/database';
 
-const DAILY_REWARD_AMOUNT = Number(process.env.DAILY_REWARD_AMOUNT ?? 10);
+const DAILY_REWARD_AMOUNT = Number(process.env.DAILY_REWARD_AMOUNT ?? 1000);
 const DAILY_MIN_INTERVAL_HOURS = Number(process.env.DAILY_REWARD_INTERVAL_HOURS ?? 24);
 
-function createSupabaseServerClient() {
-  const cookieStore = cookies();
-
-  return createServerClient(
+export async function POST(_req: NextRequest) {
+  const cookieStore = await cookies();
+  const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -16,16 +16,18 @@ function createSupabaseServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+        setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Server Component context
+          }
         },
       },
     }
   );
-}
-
-export async function POST(_req: NextRequest) {
-  const supabase = createSupabaseServerClient();
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
@@ -56,4 +58,3 @@ export async function POST(_req: NextRequest) {
     { status }
   );
 }
-

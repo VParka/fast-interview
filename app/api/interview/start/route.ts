@@ -8,8 +8,9 @@
 // - Includes daily usage limit enforcement
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
+import type { Database } from '@/types/database';
 import { generateInterviewerResponse, type UserKeyword, getRandomMBTI } from '@/lib/llm/router';
 import { ragService } from '@/lib/rag/service';
 import {
@@ -26,6 +27,8 @@ import {
   sanitizeForLogging,
   isValidUUID,
 } from '@/lib/security';
+
+const INTERVIEW_START_CREDIT = Number(process.env.CREDIT_USE_INTERVIEW_START ?? 5);
 
 export async function POST(req: NextRequest) {
   console.log('=== Interview Start API Called ===');
@@ -100,9 +103,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create Supabase client with cookies for auth
     const cookieStore = await cookies();
-    const supabase = createServerClient(
+    const supabase = createServerClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
@@ -110,7 +112,7 @@ export async function POST(req: NextRequest) {
           getAll() {
             return cookieStore.getAll();
           },
-          setAll(cookiesToSet) {
+          setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)
@@ -145,6 +147,37 @@ export async function POST(req: NextRequest) {
 
     console.log('User authenticated:', user.id, user.email);
     const userId = user.id;
+
+    // ============================================
+    // Credit charge for starting interview
+    // ============================================
+    if (INTERVIEW_START_CREDIT > 0) {
+      const { data: chargeResult, error: chargeError } = await supabase.rpc('use_credit', {
+        p_user_id: userId,
+        p_amount: INTERVIEW_START_CREDIT,
+        p_reason: 'INTERVIEW_START',
+      });
+
+      if (chargeError) {
+        console.error('Credit charge error:', chargeError);
+        return NextResponse.json(
+          { success: false, error: `크레딧 차감 실패: ${chargeError.message}` },
+          { status: 400 }
+        );
+      }
+
+      if (!chargeResult?.success) {
+        const status = chargeResult?.error === 'insufficient_funds' ? 402 : 409;
+        return NextResponse.json(
+          {
+            success: false,
+            error: chargeResult?.error || '크레딧 차감 실패',
+            balance: chargeResult?.balance,
+          },
+          { status }
+        );
+      }
+    }
 
     // ============================================
     // Daily Limit Check
