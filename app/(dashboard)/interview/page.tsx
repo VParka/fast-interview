@@ -703,26 +703,19 @@ export default function InterviewPage() {
         ) : (
           // Interview Screen
           <div className="h-full flex flex-col">
-            {/* AI Guidance Panel - Shows at interview start for 10 seconds */}
-            <AnimatePresence>
-              {showGuidance && (
-                <motion.div
-                  initial={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
-                  className="p-6 pb-0"
-                >
-                  <GuidancePanel
-                    tips={[
-                      { text: '구체적인 경험과 사례를 들어 설명하세요', type: 'detail' },
-                      { text: '정량적 결과나 수치를 포함하면 좋습니다', type: 'detail' },
-                      { text: '약 30초-1분 분량으로 답변해주세요', type: 'time' },
-                    ]}
-                    show={true}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* AI Guidance Panel - Shows at interview start for 10 seconds then disappears */}
+            {showGuidance && (
+              <div className="p-6 pb-0">
+                <GuidancePanel
+                  tips={[
+                    { text: '구체적인 경험과 사례를 들어 설명하세요', type: 'detail' },
+                    { text: '정량적 결과나 수치를 포함하면 좋습니다', type: 'detail' },
+                    { text: '약 30초-1분 분량으로 답변해주세요', type: 'time' },
+                  ]}
+                  show={true}
+                />
+              </div>
+            )}
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
