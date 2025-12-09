@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { PricingCard } from "@/components/pricing/PricingCard";
 import { PlanSwitcher } from "@/components/pricing/PlanSwitcher";
 import { PLANS } from "@/lib/constants/pricing";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { PaymentModal } from "@/components/pricing/PaymentModal";
 
@@ -17,7 +17,7 @@ export function PricingSection() {
   const [userTier, setUserTier] = useState<string>("seed");
   const [userId, setUserId] = useState<string | null>(null);
 
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -26,12 +26,12 @@ export function PricingSection() {
 
       setUserId(session.user.id);
 
-      const { data: profile } = await supabase
+      const { data: profile } = await (supabase as any)
         .from("profiles")
         .select("tier")
         .eq("id", session.user.id)
         .single();
-      
+
       if (profile?.tier) {
         setUserTier(profile.tier);
       }
@@ -76,7 +76,7 @@ export function PricingSection() {
       const bonusCredits = selectedPlanId === 'bloom' ? 30000 : 0;
       
       if (bonusCredits > 0) {
-        const { error: creditError } = await supabase.rpc('add_credit', {
+        const { error: creditError } = await (supabase as any).rpc('add_credit', {
           p_user_id: userId,
           p_amount: bonusCredits,
           p_reason: `PLAN_UPGRADE_${selectedPlanId.toUpperCase()}`
@@ -89,9 +89,9 @@ export function PricingSection() {
       }
 
       // 3. Update User Tier
-      const { error: profileError } = await supabase
+      const { error: profileError } = await (supabase as any)
         .from('profiles')
-        .update({ tier: selectedPlanId as any }) 
+        .update({ tier: selectedPlanId })
         .eq('id', userId);
 
       if (profileError) {
