@@ -39,7 +39,7 @@ export async function POST(_req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data, error } = await supabase.rpc('award_daily_login', {
+  const { data, error } = await (supabase as any).rpc('award_daily_login', {
     p_user_id: authData.user.id,
     p_amount: DAILY_REWARD_AMOUNT,
     p_min_interval_hours: DAILY_MIN_INTERVAL_HOURS,

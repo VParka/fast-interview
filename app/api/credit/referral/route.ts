@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   // 본인 코드 입력 방지 등은 RPC 내부에서 처리하거나 여기서 체크
   // 여기서는 RPC를 호출한다고 가정 (apply_referral)
-  const { data, error } = await supabase.rpc('apply_referral', {
+  const { data, error } = await (supabase as any).rpc('apply_referral', {
     p_user_id: authData.user.id,
     p_code: code,
   });

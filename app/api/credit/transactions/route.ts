@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   const limitParam = Number(req.nextUrl.searchParams.get('limit') ?? '50');
   const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 200) : 50;
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('credit_transactions')
     .select('id, amount, reason, balance_after, meta, created_at')
     .eq('user_id', authData.user.id)

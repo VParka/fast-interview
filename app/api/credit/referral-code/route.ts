@@ -35,9 +35,9 @@ export async function GET(_req: NextRequest) {
   const userId = authData.user.id;
 
   // 보장 및 조회
-  await supabase.rpc('ensure_referral_profile', { p_user_id: userId });
+  await (supabase as any).rpc('ensure_referral_profile', { p_user_id: userId });
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('referral')
     .select('referral_code')
     .eq('user_id', userId)

@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   // RPC 호출
-  const { data, error } = await supabase.rpc('use_credit', {
+  const { data, error } = await (supabase as any).rpc('use_credit', {
     p_user_id: authData.user.id,
     p_amount: validAmount,
     p_reason: reason || 'API Usage',
