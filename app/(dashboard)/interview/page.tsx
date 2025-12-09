@@ -19,6 +19,12 @@ import {
   Send,
 } from "lucide-react";
 import { INTERVIEWERS, type InterviewerType } from "@/types/interview";
+import { ContextReferenceCard } from "@/components/interview/ContextReferenceCard";
+import { GuidancePanel } from "@/components/interview/GuidancePanel";
+import { RealTimeFeedback, type FeedbackType } from "@/components/interview/RealTimeFeedback";
+import { InterviewerAvatar } from "@/components/interview/InterviewerAvatar";
+import { VoiceVisualizer } from "@/components/interview/VoiceVisualizer";
+import { PageTransition } from "@/components/ui/PageTransition";
 
 // Interviewer array for UI
 const interviewersList = Object.values(INTERVIEWERS);
@@ -31,6 +37,11 @@ interface Message {
   innerThought?: string;
   timestamp: Date;
   scoreChange?: number; // 이 메시지로 인한 점수 변화
+  evaluation?: {
+    relevance: number;
+    clarity: number;
+    depth: number;
+  };
 }
 
 // Status messages
@@ -66,6 +77,12 @@ export default function InterviewPage() {
   const [textInput, setTextInput] = useState("");
   const [showInnerThoughts, setShowInnerThoughts] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
+  
+  // New UI enhancements
+  const [previousAnswer, setPreviousAnswer] = useState<string | null>(null);
+  const [showContext, setShowContext] = useState(false);
+  const [expandedContext, setExpandedContext] = useState(false);
+  const [showGuidance, setShowGuidance] = useState(true);
 
   // Timer state
   const [timerActive, setTimerActive] = useState(false);
@@ -276,7 +293,7 @@ export default function InterviewPage() {
         return;
       }
 
-      // Add interviewer message
+      // Add interviewer message with evaluation
       const aiMessage: Message = {
         id: data.interviewer_response.id,
         role: "interviewer",
@@ -284,8 +301,13 @@ export default function InterviewPage() {
         interviewerId: data.interviewer.id,
         innerThought: data.interviewer_response.structured_response?.inner_thought,
         timestamp: new Date(),
+        evaluation: data.interviewer_response.structured_response?.evaluation,
       };
       setMessages((prev) => [...prev, aiMessage]);
+
+      // Set previous answer for context card
+      setPreviousAnswer(userText);
+      setShowContext(true); // Show context card for next question
 
       // Update state
       setCurrentInterviewerId(data.interviewer.id);
@@ -453,36 +475,21 @@ export default function InterviewPage() {
   const timerProgress = (timeRemaining / 120) * 100;
 
   return (
+    <PageTransition>
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-3 border-b border-border/50">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {interviewersList.map((interviewer) => (
-            <motion.div
+            <InterviewerAvatar
               key={interviewer.id}
-              animate={{
-                scale: currentInterviewerId === interviewer.id ? 1.05 : 1,
-                opacity: currentInterviewerId === interviewer.id ? 1 : 0.6,
-              }}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${
-                currentInterviewerId === interviewer.id
-                  ? "bg-mint/10 ring-2 ring-mint"
-                  : "bg-secondary/30"
-              }`}
-            >
-              <span className="text-xl">{interviewer.emoji}</span>
-              <div>
-                <p className="text-sm font-medium text-foreground">{interviewer.name}</p>
-                <p className="text-xs text-muted-foreground">{interviewer.role}</p>
-              </div>
-              {currentInterviewerId === interviewer.id && (isProcessing || isSpeaking) && (
-                <div className="voice-wave ml-2">
-                  {[...Array(3)].map((_, i) => (
-                    <span key={i} style={{ height: `${8 + i * 4}px` }} />
-                  ))}
-                </div>
-              )}
-            </motion.div>
+              name={interviewer.name}
+              role={interviewer.role}
+              emoji={interviewer.emoji}
+              isActive={currentInterviewerId === interviewer.id}
+              isListening={currentInterviewerId === interviewer.id && (isRecording || isSpeaking)}
+              isThinking={currentInterviewerId === interviewer.id && isProcessing}
+            />
           ))}
         </div>
 
@@ -594,18 +601,54 @@ export default function InterviewPage() {
           <div className="h-full flex flex-col">
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.map((message) => {
+              {messages.map((message, index) => {
                 const msgInterviewer = message.interviewerId
                   ? INTERVIEWERS[message.interviewerId]
                   : null;
+                
+                // Check if this is the latest interviewer message
+                const isLatestInterviewerMsg = message.role === 'interviewer' && 
+                  index === messages.findLastIndex(m => m.role === 'interviewer');
+                
+                // Get previous user answer for context
+                const prevUserMsg = index > 0 && message.role === 'interviewer' 
+                  ? messages.slice(0, index).reverse().find(m => m.role === 'user')
+                  : null;
 
                 return (
-                  <motion.div
-                    key={message.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex gap-3 ${message.role === "user" ? "justify-end" : ""}`}
-                  >
+                  <div key={message.id}>
+                    {/* Show context and guidance before latest interviewer message */}
+                    {isLatestInterviewerMsg && (
+                      <>
+                        {/* Previous Answer Context */}
+                        {prevUserMsg && showContext && (
+                          <ContextReferenceCard
+                            previousAnswer={prevUserMsg.content}
+                            keywords={[]}
+                            expanded={expandedContext}
+                            onExpand={() => setExpandedContext(!expandedContext)}
+                          />
+                        )}
+                        
+                        {/* AI Guidance Panel */}
+                        {showGuidance && turnCount <= 3 && (
+                          <GuidancePanel
+                            tips={[
+                              { text: '구체적인 팀원 반응이나 피드백을 언급하세요', type: 'detail' },
+                              { text: '정량적 결과나 수치를 포함하면 좋습니다', type: 'detail' },
+                              { text: '약 30초-1분 분량으로 답변해주세요', type: 'time' },
+                            ]}
+                            show={showGuidance}
+                          />
+                        )}
+                      </>
+                    )}
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`flex gap-3 ${message.role === "user" ? "justify-end" : ""}`}
+                    >
                     {message.role === "interviewer" && msgInterviewer && (
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-mint/20 to-soft-blue/20 flex items-center justify-center text-xl shrink-0">
                         {msgInterviewer.emoji}
@@ -641,6 +684,31 @@ export default function InterviewPage() {
                           </p>
                         </motion.div>
                       )}
+                      
+                      {/* Evaluation feedback chips (for interviewer messages) */}
+                      {message.role === 'interviewer' && message.evaluation && (
+                        <div className="ml-4 mt-2">
+                          <RealTimeFeedback
+                            chips={[
+                              {
+                                label: '관련성',
+                                value: `${message.evaluation.relevance}점`,
+                                type: message.evaluation.relevance >= 80 ? 'excellent' : message.evaluation.relevance >= 60 ? 'good' : 'needs-work',
+                              },
+                              {
+                                label: '명확성',
+                                value: `${message.evaluation.clarity}점`,
+                                type: message.evaluation.clarity >= 80 ? 'excellent' : message.evaluation.clarity >= 60 ? 'good' : 'needs-work',
+                              },
+                              {
+                                label: '깊이',
+                                value: `${message.evaluation.depth}점`,
+                                type: message.evaluation.depth >= 80 ? 'excellent' : message.evaluation.depth >= 60 ? 'good' : 'needs-work',
+                              },
+                            ]}
+                          />
+                        </div>
+                      )}
                     </div>
                     {message.role === "user" && (
                       <div className="w-10 h-10 rounded-xl bg-mint/20 flex items-center justify-center shrink-0">
@@ -648,6 +716,7 @@ export default function InterviewPage() {
                       </div>
                     )}
                   </motion.div>
+                  </div>
                 );
               })}
 
@@ -682,8 +751,28 @@ export default function InterviewPage() {
               </div>
             )}
 
-            {/* Controls */}
-            <div className="p-6 border-t border-border/50">
+            {/* Input controls */}
+            <div className="border-t border-border/50 p-4 bg-background/80 backdrop-blur-sm">
+              {/* Recording visualization */}
+              {isRecording && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-4"
+                >
+                  <VoiceVisualizer
+                    audioLevel={audioLevel}
+                    isRecording={isRecording}
+                    timeElapsed={120 - timeRemaining}
+                  />
+                  <div className="text-center mt-2">
+                    <p className="text-sm text-muted-foreground">
+                      🎤 녹음 중... {formatTime(120 - timeRemaining)}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
               {/* Timer Progress Bar */}
               {timerActive && (
                 <div className="mb-4">
@@ -810,5 +899,6 @@ export default function InterviewPage() {
         )}
       </div>
     </div>
+    </PageTransition>
   );
 }

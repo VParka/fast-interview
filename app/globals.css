@@ -104,6 +104,23 @@
     --shadow-lg: 0 16px 64px hsl(0 0% 0% / 0.4);
     --shadow-glow: 0 0 80px hsl(159 100% 74% / 0.2);
     --shadow-mint: 0 8px 60px hsl(159 100% 74% / 0.15);
+    
+    /* Conversational Interface Colors */
+    --interview-primary: 159 100% 42%;        /* Mint Green #00D9A3 */
+    --interview-primary-dark: 159 100% 35%;   /* #00B388 */
+    --interview-primary-light: 159 100% 97%;  /* #E6FFF9 */
+    
+    --interview-secondary: 249 100% 69%;      /* Purple #6C63FF */
+    --interview-accent: 339 100% 70%;         /* Pink #FF6B9D */
+    
+    --interview-success: 158 64% 52%;         /* #10B981 */
+    --interview-warning: 38 92% 50%;          /* #F59E0B */
+    --interview-error: 4 90% 58%;             /* #EF4444 */
+    
+    /* Feedback Chip Colors */
+    --chip-excellent: 142 71% 45%;            /* Green */
+    --chip-good: 45 93% 47%;                  /* Yellow */
+    --chip-needs-work: 0 84% 60%;             /* Red */
   }
 }
 
@@ -525,4 +542,68 @@
   overflow: hidden;
   white-space: nowrap;
   animation: typing 2s steps(40, end);
+}
+
+/* Interview-specific animations */
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes nod {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(-2deg); }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+@keyframes chip-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Interview animation classes */
+.animate-breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+.animate-nod {
+  animation: nod 1s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, hsl(var(--muted-foreground) / 0.1), transparent);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-chip-pulse {
+  animation: chip-pulse 2s ease-in-out infinite;
 }
