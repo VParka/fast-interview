@@ -80,8 +80,8 @@ async function llamaParseRequest(
     formData.append('parsing_instruction', config.parsingInstructions);
   }
 
-  // LlamaParse API endpoint
-  const response = await fetch('https://api.cloud.llamaindex.ai/api/parsing/upload', {
+  // LlamaParse API endpoint (v1)
+  const response = await fetch('https://api.cloud.llamaindex.ai/api/v1/parsing/upload', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -122,7 +122,7 @@ async function pollLlamaParseJob(jobId: string, apiKey: string, maxAttempts: num
   const pollInterval = 2000; // 2 seconds
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetch(`https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}`, {
+    const response = await fetch(`https://api.cloud.llamaindex.ai/api/v1/parsing/job/${jobId}`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
       },
