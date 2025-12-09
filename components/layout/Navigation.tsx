@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogOut, User } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import {
@@ -110,10 +111,13 @@ export function Navigation() {
             className="flex items-center gap-2 sm:gap-3 group touch-target"
             whileHover={{ scale: 1.02 }}
           >
-            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-mint to-soft-blue flex items-center justify-center shadow-mint">
-              <span className="font-display font-bold text-navy text-base sm:text-lg">IM</span>
-              <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-mint/30 blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
+            <Image
+              src="/app-icon-dark.png"
+              alt="IMSAM"
+              width={30}
+              height={30}
+              className="w-8 h-8 object-contain"
+            />
             <span className="font-display font-semibold text-lg sm:text-xl text-foreground">
               IMSAM
             </span>

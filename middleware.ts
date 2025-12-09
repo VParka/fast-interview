@@ -2,6 +2,14 @@ import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
+  // TEST_MODE가 활성화되어 있으면 인증 체크를 우회
+  const TEST_MODE = process.env.TEST_MODE === "true";
+  
+  if (TEST_MODE) {
+    console.log("🧪 TEST_MODE: 인증 체크 우회");
+    return;
+  }
+  
   return await updateSession(request);
 }
 
@@ -12,7 +20,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
+     * - images - .svg, .png, .jpg, .jpeg, .gif, webp
      * Feel free to modify this pattern to include more paths.
      */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
