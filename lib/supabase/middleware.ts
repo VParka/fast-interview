@@ -173,6 +173,7 @@ export async function updateSession(request: NextRequest) {
     '/api/upload',
     '/api/rag',
     '/api/profile',
+    '/api/credit',
   ];
 
   const isProtectedApi = protectedApiPaths.some(path =>

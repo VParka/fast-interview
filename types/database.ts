@@ -322,6 +322,96 @@ export interface Database {
           summary?: string;
         };
       };
+      credits: {
+        Row: {
+          id: string;
+          user_id: string;
+          current_credits: number;
+          total_earned: number;
+          total_used: number;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          current_credits?: number;
+          total_earned?: number;
+          total_used?: number;
+          updated_at?: string;
+        };
+        Update: {
+          current_credits?: number;
+          total_earned?: number;
+          total_used?: number;
+          updated_at?: string;
+        };
+      };
+      referral: {
+        Row: {
+          id: string;
+          user_id: string;
+          referral_code: string;
+          referred_by: string | null;
+          referred_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          referral_code: string;
+          referred_by?: string | null;
+          referred_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          referral_code?: string;
+          referred_by?: string | null;
+          referred_at?: string | null;
+          created_at?: string;
+        };
+      };
+      daily_login_log: {
+        Row: {
+          id: string;
+          user_id: string;
+          rewarded_at: string;
+          reward_date: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          rewarded_at?: string;
+        };
+        Update: {
+          rewarded_at?: string;
+        };
+      };
+      credit_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          amount: number;
+          reason: string;
+          balance_after: number | null;
+          meta: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          amount: number;
+          reason: string;
+          balance_after?: number | null;
+          meta?: Json;
+          created_at?: string;
+        };
+        Update: {
+          amount?: number;
+          reason?: string;
+          balance_after?: number | null;
+          meta?: Json;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -357,6 +447,57 @@ export interface Database {
           p_mentioned_count: number;
         };
         Returns: void;
+      };
+      award_daily_login: {
+        Args: {
+          p_user_id: string;
+          p_amount?: number;
+          p_min_interval_hours?: number;
+        };
+        Returns: Json;
+      };
+      award_referral: {
+        Args: {
+          p_referral_code: string;
+          p_friend_user_id: string;
+          p_self_amount?: number;
+          p_referrer_amount?: number;
+        };
+        Returns: Json;
+      };
+      add_credit: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_reason?: string;
+        };
+        Returns: Json;
+      };
+      use_credit: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_reason?: string;
+        };
+        Returns: Json;
+      };
+      ensure_referral_profile: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: void;
+      };
+      ensure_credit_account: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: void;
+      };
+      generate_referral_code: {
+        Args: {
+          p_length?: number;
+        };
+        Returns: string;
       };
     };
     Enums: {
