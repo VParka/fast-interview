@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -12,12 +12,14 @@ import {
   LogOut,
   User,
   Loader2,
+  History,
 } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 const navItems = [
   { icon: LayoutDashboard, label: "대시보드", href: "/dashboard" },
   { icon: Mic, label: "면접 시작", href: "/interview" },
+  { icon: History, label: "면접 기록", href: "/dashboard/history" },
   { icon: BarChart3, label: "분석 리포트", href: "/dashboard/reports" },
   { icon: Settings, label: "설정", href: "/dashboard/settings" },
 ];
@@ -37,7 +39,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const supabase = createBrowserSupabaseClient();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   useEffect(() => {
     const fetchUser = async () => {

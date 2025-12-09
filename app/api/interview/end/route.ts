@@ -3,7 +3,7 @@
 // ============================================
 // POST /api/interview/end
 // - Ends interview session
-// - Generates 8-axis competency analysis
+// - Generates 8-axis competency analysis with rubric-based scoring
 // - Returns interview result
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,28 +11,106 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { INTERVIEWERS, type InterviewerType } from '@/types/interview';
 import { extractInterviewKeywords, type ChatMessage } from '@/lib/llm/router';
+import { generateRubricDocument, PASS_CRITERIA } from '@/lib/llm/prompts/scoring-rubric';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Schema for evaluation
+// Detailed evaluation schema with rubric-based scoring
 const EVALUATION_SCHEMA = {
   type: 'object' as const,
   properties: {
-    overall_score: { type: 'number', description: '전체 점수 (0-100)' },
-    pass_status: { type: 'string', enum: ['pass', 'borderline', 'fail'] },
-    interviewer_scores: {
+    // 5축 핵심 평가 (1-5점 척도)
+    category_scores: {
       type: 'object',
       properties: {
-        hiring_manager: { type: 'number' },
-        hr_manager: { type: 'number' },
-        senior_peer: { type: 'number' },
+        logical_structure: {
+          type: 'object',
+          properties: {
+            score: { type: 'integer', description: '1-5점 척도' },
+            reasoning: { type: 'string', description: '점수 근거 (답변 인용 포함)' },
+          },
+          required: ['score', 'reasoning'],
+          additionalProperties: false,
+        },
+        job_expertise: {
+          type: 'object',
+          properties: {
+            score: { type: 'integer', description: '1-5점 척도' },
+            reasoning: { type: 'string', description: '점수 근거 (답변 인용 포함)' },
+          },
+          required: ['score', 'reasoning'],
+          additionalProperties: false,
+        },
+        attitude_communication: {
+          type: 'object',
+          properties: {
+            score: { type: 'integer', description: '1-5점 척도' },
+            reasoning: { type: 'string', description: '점수 근거 (답변 인용 포함)' },
+          },
+          required: ['score', 'reasoning'],
+          additionalProperties: false,
+        },
+        company_fit: {
+          type: 'object',
+          properties: {
+            score: { type: 'integer', description: '1-5점 척도' },
+            reasoning: { type: 'string', description: '점수 근거 (답변 인용 포함)' },
+          },
+          required: ['score', 'reasoning'],
+          additionalProperties: false,
+        },
+        growth_potential: {
+          type: 'object',
+          properties: {
+            score: { type: 'integer', description: '1-5점 척도' },
+            reasoning: { type: 'string', description: '점수 근거 (답변 인용 포함)' },
+          },
+          required: ['score', 'reasoning'],
+          additionalProperties: false,
+        },
+      },
+      required: ['logical_structure', 'job_expertise', 'attitude_communication', 'company_fit', 'growth_potential'],
+      additionalProperties: false,
+    },
+    // 면접관별 인상 점수
+    interviewer_impressions: {
+      type: 'object',
+      properties: {
+        hiring_manager: {
+          type: 'object',
+          properties: {
+            score: { type: 'number', description: '0-100점' },
+            comment: { type: 'string', description: '한 줄 평가' },
+          },
+          required: ['score', 'comment'],
+          additionalProperties: false,
+        },
+        hr_manager: {
+          type: 'object',
+          properties: {
+            score: { type: 'number', description: '0-100점' },
+            comment: { type: 'string', description: '한 줄 평가' },
+          },
+          required: ['score', 'comment'],
+          additionalProperties: false,
+        },
+        senior_peer: {
+          type: 'object',
+          properties: {
+            score: { type: 'number', description: '0-100점' },
+            comment: { type: 'string', description: '한 줄 평가' },
+          },
+          required: ['score', 'comment'],
+          additionalProperties: false,
+        },
       },
       required: ['hiring_manager', 'hr_manager', 'senior_peer'],
       additionalProperties: false,
     },
+    // 8축 역량 점수 (0-100)
     competency_scores: {
       type: 'object',
       properties: {
@@ -52,18 +130,17 @@ const EVALUATION_SCHEMA = {
     strengths: {
       type: 'array',
       items: { type: 'string' },
-      description: '강점 3가지',
+      description: '강점 3가지 (구체적 근거 포함)',
     },
     improvements: {
       type: 'array',
       items: { type: 'string' },
-      description: '개선점 3가지',
+      description: '개선점 3가지 (구체적 조언 포함)',
     },
   },
   required: [
-    'overall_score',
-    'pass_status',
-    'interviewer_scores',
+    'category_scores',
+    'interviewer_impressions',
     'competency_scores',
     'feedback_summary',
     'strengths',
@@ -164,31 +241,64 @@ export async function POST(req: NextRequest) {
       })
       .join('\n');
 
-    // Generate evaluation using GPT-4o with structured output
-    const evaluationPrompt = `다음은 AI 면접 기록입니다. 지원자의 면접 성과를 8가지 역량 축으로 분석하고 평가해주세요.
+    // Generate rubric document for evaluation
+    const rubricDoc = generateRubricDocument();
 
-직무: ${session.job_type}
-난이도: ${session.difficulty}
+    // Generate evaluation using GPT-4o with rubric-based structured output
+    const evaluationPrompt = `다음은 AI 면접 기록입니다. 아래 루브릭에 따라 지원자의 면접 성과를 **엄격하게** 평가해주세요.
 
-면접 기록:
+## 면접 정보
+- 직무: ${session.job_type}
+- 난이도: ${session.difficulty}
+
+## 평가 루브릭
+${rubricDoc}
+
+## 면접 기록
 ${transcript}
 
-평가 기준:
-1. behavioral (행동 역량): 과거 행동 기반 답변의 질
-2. clarity (명확성): 답변의 명확하고 구조적인 전달
-3. comprehension (이해력): 질문 이해와 적절한 응답
-4. communication (커뮤니케이션): 의사소통 능력
-5. reasoning (논리적 사고): 논리적 흐름과 근거
-6. problem_solving (문제 해결): 문제 해결 접근법
-7. leadership (리더십): 리더십 및 팀워크
-8. adaptability (적응력): 변화 대응 능력
+## 평가 지침
 
-각 역량을 0-100점으로 평가하고, 전체 점수와 합격 여부를 판단해주세요.`;
+### 1. 5축 핵심 평가 (1-5점)
+각 항목을 루브릭 기준에 따라 엄격하게 채점하세요:
+- **5점**: 완벽한 수준, 기대를 크게 초과
+- **4점**: 좋음, 기대 충족
+- **3점**: 보통, 무난한 수준 (기본)
+- **2점**: 부족, 개선 필요
+- **1점**: 매우 부족, 기준 미달
+
+### 2. 면접관별 인상 점수 (0-100점)
+각 면접관의 관점에서 평가:
+- **실무팀장(hiring_manager)**: 직무 전문성(45%), 문제해결력 중시
+- **HR담당자(hr_manager)**: 태도/커뮤니케이션(35%), 조직적합성(25%) 중시
+- **시니어동료(senior_peer)**: 직무전문성(35%), 성장가능성(25%) 중시
+
+### 3. 8축 역량 점수 (0-100점)
+5축 점수를 기반으로 8축 역량으로 변환하여 평가
+
+### 4. 총점 계산 공식
+총점 = (논리적구조×0.20 + 직무전문성×0.30 + 태도×0.20 + 적합도×0.15 + 성장성×0.15) × 20
+
+- 70점 이상: 합격 (pass)
+- 50-69점: 보류 (borderline)
+- 50점 미만: 불합격 (fail)
+
+### 중요
+- 모든 점수의 근거를 면접 내용에서 직접 인용하세요
+- 강점과 개선점은 구체적인 예시와 함께 제시하세요
+- 관대한 점수 금지: 평균적인 면접은 3점(60점)입니다`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: '당신은 면접 평가 전문가입니다. 객관적이고 구체적인 평가를 제공합니다.' },
+        {
+          role: 'system',
+          content: `당신은 면접 평가 전문가입니다.
+루브릭에 따라 객관적이고 엄격하게 평가합니다.
+- 증거 기반 평가: 모든 점수의 근거를 답변 내용에서 직접 인용
+- 관대한 점수 금지: 5점은 완벽한 답변에만, 의심스러우면 낮은 점수
+- 일관성 유지: 동일한 수준의 답변에는 동일한 점수`
+        },
         { role: 'user', content: evaluationPrompt },
       ],
       response_format: {
@@ -199,7 +309,7 @@ ${transcript}
           schema: EVALUATION_SCHEMA,
         },
       },
-      temperature: 0.3,
+      temperature: 0, // 일관된 채점을 위해 0으로 설정
     });
 
     const evaluationText = completion.choices[0]?.message?.content || '{}';
@@ -211,9 +321,18 @@ ${transcript}
       console.error('Failed to parse evaluation:', evaluationText);
       // Provide default evaluation
       evaluation = {
-        overall_score: 60,
-        pass_status: 'borderline',
-        interviewer_scores: { hiring_manager: 60, hr_manager: 60, senior_peer: 60 },
+        category_scores: {
+          logical_structure: { score: 3, reasoning: '평가 오류' },
+          job_expertise: { score: 3, reasoning: '평가 오류' },
+          attitude_communication: { score: 3, reasoning: '평가 오류' },
+          company_fit: { score: 3, reasoning: '평가 오류' },
+          growth_potential: { score: 3, reasoning: '평가 오류' },
+        },
+        interviewer_impressions: {
+          hiring_manager: { score: 60, comment: '평가 중 오류 발생' },
+          hr_manager: { score: 60, comment: '평가 중 오류 발생' },
+          senior_peer: { score: 60, comment: '평가 중 오류 발생' },
+        },
         competency_scores: {
           behavioral: 60, clarity: 60, comprehension: 60, communication: 60,
           reasoning: 60, problem_solving: 60, leadership: 60, adaptability: 60,
@@ -224,25 +343,53 @@ ${transcript}
       };
     }
 
+    // Calculate overall score from category scores using rubric weights
+    const categoryScores = evaluation.category_scores;
+    const overallScore = Math.round(
+      (((categoryScores.logical_structure.score - 1) / 4) * 100 * 0.20) +
+      (((categoryScores.job_expertise.score - 1) / 4) * 100 * 0.30) +
+      (((categoryScores.attitude_communication.score - 1) / 4) * 100 * 0.20) +
+      (((categoryScores.company_fit.score - 1) / 4) * 100 * 0.15) +
+      (((categoryScores.growth_potential.score - 1) / 4) * 100 * 0.15)
+    );
+
+    // Determine pass status based on calculated score
+    const passStatus = overallScore >= PASS_CRITERIA.pass ? 'pass' :
+                       overallScore >= PASS_CRITERIA.borderline ? 'borderline' : 'fail';
+
+    // Extract interviewer scores
+    const interviewerScores = {
+      hiring_manager: Math.round(evaluation.interviewer_impressions.hiring_manager.score),
+      hr_manager: Math.round(evaluation.interviewer_impressions.hr_manager.score),
+      senior_peer: Math.round(evaluation.interviewer_impressions.senior_peer.score),
+    };
+
     // Update session status
     await supabase
       .from('interview_sessions')
       .update({ status: 'completed' })
       .eq('id', session_id);
 
-    // Save interview result
+    // Save interview result with detailed evaluation data
     const { data: result, error: resultError } = await supabase
       .from('interview_results')
       .insert({
         session_id,
         user_id: session.user_id,
-        overall_score: evaluation.overall_score,
-        pass_status: evaluation.pass_status,
-        interviewer_scores: evaluation.interviewer_scores,
+        overall_score: overallScore,
+        pass_status: passStatus,
+        interviewer_scores: interviewerScores,
         competency_scores: evaluation.competency_scores,
         feedback_summary: evaluation.feedback_summary,
         strengths: evaluation.strengths,
         improvements: evaluation.improvements,
+        // Store detailed category scores with reasoning for future reference
+        category_scores: evaluation.category_scores,
+        interviewer_comments: {
+          hiring_manager: evaluation.interviewer_impressions.hiring_manager.comment,
+          hr_manager: evaluation.interviewer_impressions.hr_manager.comment,
+          senior_peer: evaluation.interviewer_impressions.senior_peer.comment,
+        },
       })
       .select()
       .single();
@@ -315,10 +462,16 @@ ${transcript}
       result: {
         id: result?.id || session_id,
         session_id,
-        overall_score: evaluation.overall_score,
-        pass_status: evaluation.pass_status,
-        interviewer_scores: evaluation.interviewer_scores,
+        overall_score: overallScore,
+        pass_status: passStatus,
+        interviewer_scores: interviewerScores,
         competency_scores: evaluation.competency_scores,
+        category_scores: evaluation.category_scores,
+        interviewer_comments: {
+          hiring_manager: evaluation.interviewer_impressions.hiring_manager.comment,
+          hr_manager: evaluation.interviewer_impressions.hr_manager.comment,
+          senior_peer: evaluation.interviewer_impressions.senior_peer.comment,
+        },
         feedback_summary: evaluation.feedback_summary,
         strengths: evaluation.strengths,
         improvements: evaluation.improvements,
