@@ -689,7 +689,7 @@ export default function InterviewPage() {
                 <Button
                   size="xl"
                   onClick={() => router.push("/interview/setup")}
-                  className="gap-2 bg-rose-600 hover:bg-rose-700 text-white"
+                  className="gap-2 bg-rose-600 hover:bg-rose-700 text-white shadow-none hover:shadow-[0_0_20px_rgba(225,29,72,0.4)] hover:scale-[1.02]"
                 >
                   설정 변경
                 </Button>
