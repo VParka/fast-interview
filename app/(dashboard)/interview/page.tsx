@@ -18,16 +18,14 @@ import {
   Clock,
   Send,
 } from "lucide-react";
-import { INTERVIEWERS, type InterviewerType } from "@/types/interview";
-import { ContextReferenceCard } from "@/components/interview/ContextReferenceCard";
+import { INTERVIEWER_BASE, type InterviewerType, type SessionInterviewerNames } from "@/types/interview";
 import { GuidancePanel } from "@/components/interview/GuidancePanel";
-import { RealTimeFeedback, type FeedbackType } from "@/components/interview/RealTimeFeedback";
 import { InterviewerAvatar } from "@/components/interview/InterviewerAvatar";
 import { VoiceVisualizer } from "@/components/interview/VoiceVisualizer";
 import { PageTransition } from "@/components/ui/PageTransition";
 
-// Interviewer array for UI
-const interviewersList = Object.values(INTERVIEWERS);
+// Interviewer types for UI
+const interviewerTypes: InterviewerType[] = ['hiring_manager', 'hr_manager', 'senior_peer'];
 
 interface Message {
   id: string;
@@ -36,12 +34,6 @@ interface Message {
   interviewerId?: InterviewerType;
   innerThought?: string;
   timestamp: Date;
-  scoreChange?: number; // 이 메시지로 인한 점수 변화
-  evaluation?: {
-    relevance: number;
-    clarity: number;
-    depth: number;
-  };
 }
 
 // Status messages
@@ -59,7 +51,6 @@ export default function InterviewPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isInterviewStarted, setIsInterviewStarted] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
-  const [maxTurns] = useState(3);
 
   // Audio state
   const [isRecording, setIsRecording] = useState(false);
@@ -77,16 +68,23 @@ export default function InterviewPage() {
   const [textInput, setTextInput] = useState("");
   const [showInnerThoughts, setShowInnerThoughts] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
-  
-  // New UI enhancements
-  const [previousAnswer, setPreviousAnswer] = useState<string | null>(null);
-  const [showContext, setShowContext] = useState(false);
-  const [expandedContext, setExpandedContext] = useState(false);
-  const [showGuidance, setShowGuidance] = useState(true);
+  const [showExitWarning, setShowExitWarning] = useState(false);
 
-  // Timer state
+  // UI state
+  const [showGuidance, setShowGuidance] = useState(true);
+  const [guidanceTimerStarted, setGuidanceTimerStarted] = useState(false);
+
+  // Interviewer names from DB (random per session)
+  const [interviewerNames, setInterviewerNames] = useState<SessionInterviewerNames>({
+    hiring_manager: '실무팀장',
+    hr_manager: 'HR 담당자',
+    senior_peer: '시니어 동료',
+  });
+
+  // Timer state - 5 minutes (300 seconds) total interview time
+  const INTERVIEW_TIME_LIMIT = 300; // 5 minutes in seconds
   const [timerActive, setTimerActive] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(120);
+  const [timeRemaining, setTimeRemaining] = useState(INTERVIEW_TIME_LIMIT);
   const [timerWarning, setTimerWarning] = useState(false);
 
   // Refs
@@ -97,25 +95,28 @@ export default function InterviewPage() {
   const animationFrameRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const guidanceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const currentInterviewer = INTERVIEWERS[currentInterviewerId];
+  const currentInterviewer = INTERVIEWER_BASE[currentInterviewerId];
 
   // Auto scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Timer countdown
+  // Timer countdown - 5 minute total interview time
   useEffect(() => {
     if (timerActive && timeRemaining > 0 && !isPaused) {
       timerIntervalRef.current = setInterval(() => {
         setTimeRemaining((prev) => {
           const newTime = prev - 1;
-          if (newTime <= 30) setTimerWarning(true);
+          if (newTime <= 60) setTimerWarning(true); // Warning at 1 minute left
           if (newTime <= 0) {
-            // Auto submit on timeout
+            // Auto end interview when time runs out
             if (isRecording) stopRecording();
             setTimerActive(false);
+            // Automatically end interview and save results
+            endInterview();
           }
           return newTime;
         });
@@ -129,10 +130,27 @@ export default function InterviewPage() {
     };
   }, [timerActive, isPaused, isRecording]);
 
+  // Auto-hide guidance after 15 seconds when interview starts
+  useEffect(() => {
+    if (isInterviewStarted && showGuidance && !guidanceTimerStarted) {
+      setGuidanceTimerStarted(true);
+      guidanceTimerRef.current = setTimeout(() => {
+        setShowGuidance(false);
+      }, 15000); // 15 seconds
+    }
+
+    return () => {
+      if (guidanceTimerRef.current) {
+        clearTimeout(guidanceTimerRef.current);
+      }
+    };
+  }, [isInterviewStarted, showGuidance, guidanceTimerStarted]);
+
   // Load session from sessionStorage on mount
   useEffect(() => {
     const storedSession = sessionStorage.getItem("interviewSession");
     const storedFirstMessage = sessionStorage.getItem("firstMessage");
+    const storedInterviewerNames = sessionStorage.getItem("interviewerNames");
 
     if (storedSession && storedFirstMessage) {
       const session = JSON.parse(storedSession);
@@ -150,12 +168,18 @@ export default function InterviewPage() {
         },
       ]);
 
+      // Load interviewer names if stored
+      if (storedInterviewerNames) {
+        setInterviewerNames(JSON.parse(storedInterviewerNames));
+        sessionStorage.removeItem("interviewerNames");
+      }
+
       // Clear sessionStorage
       sessionStorage.removeItem("interviewSession");
       sessionStorage.removeItem("firstMessage");
 
-      // Start timer for first response
-      setTimeRemaining(120);
+      // Start 5-minute countdown timer
+      setTimeRemaining(INTERVIEW_TIME_LIMIT);
       setTimerActive(true);
       setTimerWarning(false);
     }
@@ -293,7 +317,7 @@ export default function InterviewPage() {
         return;
       }
 
-      // Add interviewer message with evaluation
+      // Add interviewer message (without evaluation display)
       const aiMessage: Message = {
         id: data.interviewer_response.id,
         role: "interviewer",
@@ -301,13 +325,8 @@ export default function InterviewPage() {
         interviewerId: data.interviewer.id,
         innerThought: data.interviewer_response.structured_response?.inner_thought,
         timestamp: new Date(),
-        evaluation: data.interviewer_response.structured_response?.evaluation,
       };
       setMessages((prev) => [...prev, aiMessage]);
-
-      // Set previous answer for context card
-      setPreviousAnswer(userText);
-      setShowContext(true); // Show context card for next question
 
       // Update state
       setCurrentInterviewerId(data.interviewer.id);
@@ -318,15 +337,11 @@ export default function InterviewPage() {
         await playTTS(data.interviewer_response.content, data.interviewer.id);
       }
 
-      // Check if interview should end
+      // Check if interview should end (either by AI decision or time limit)
       if (data.should_end) {
         await endInterview();
-      } else {
-        // Reset timer for next answer
-        setTimeRemaining(120);
-        setTimerActive(true);
-        setTimerWarning(false);
       }
+      // Timer continues running - no reset per response
     } catch (err) {
       console.error("Interviewer response error:", err);
       setError("면접관 응답을 가져오는 중 오류가 발생했습니다.");
@@ -362,18 +377,28 @@ export default function InterviewPage() {
   };
 
   const handleTextSubmit = async () => {
-    if (!textInput.trim()) return;
+    if (!textInput.trim() || isProcessing) return;
+
+    // Capture text value before clearing to prevent race conditions
+    const text = textInput.trim();
+    setTextInput("");
+    setIsProcessing(true);
+    setStatusMessage(STATUS_MESSAGES.processing);
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: textInput.trim(),
+      content: text,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMessage]);
-    setTextInput("");
 
-    await getInterviewerResponse(textInput.trim());
+    try {
+      await getInterviewerResponse(text);
+    } finally {
+      setIsProcessing(false);
+      setStatusMessage("");
+    }
   };
 
   const startInterview = async () => {
@@ -396,6 +421,11 @@ export default function InterviewPage() {
       if (data.success) {
         setSessionId(data.session.id);
 
+        // Set interviewer names from API (random names per session)
+        if (data.interviewer_names) {
+          setInterviewerNames(data.interviewer_names);
+        }
+
         const welcomeMessage: Message = {
           id: data.first_message.id,
           role: "interviewer",
@@ -409,9 +439,10 @@ export default function InterviewPage() {
           await playTTS(data.first_message.content, data.first_message.interviewer_id);
         }
 
-        // Start timer
-        setTimeRemaining(120);
+        // Start 5-minute countdown timer
+        setTimeRemaining(INTERVIEW_TIME_LIMIT);
         setTimerActive(true);
+        setTimerWarning(false);
       } else {
         setError(data.error || "면접 시작 실패");
       }
@@ -429,6 +460,7 @@ export default function InterviewPage() {
 
     setIsProcessing(true);
     setStatusMessage("면접 결과를 분석 중...");
+    setTimerActive(false);
 
     try {
       const response = await fetch("/api/interview/end", {
@@ -455,6 +487,33 @@ export default function InterviewPage() {
     }
   };
 
+  // Force exit without saving - no score analysis
+  const handleForceExit = () => {
+    setShowExitWarning(true);
+  };
+
+  const confirmForceExit = async () => {
+    if (!sessionId) {
+      router.push("/dashboard");
+      return;
+    }
+
+    // Just mark session as abandoned, no score calculation
+    try {
+      const { createBrowserSupabaseClient } = await import("@/lib/supabase/client");
+      const supabase = createBrowserSupabaseClient();
+      await (supabase
+        .from("interview_sessions") as ReturnType<typeof supabase.from>)
+        .update({ status: "abandoned" } as Record<string, unknown>)
+        .eq("id", sessionId);
+    } catch (err) {
+      console.error("Failed to mark session as abandoned:", err);
+    }
+
+    // Navigate back to dashboard without saving results
+    router.push("/dashboard");
+  };
+
   const togglePause = () => {
     setIsPaused(!isPaused);
     if (!isPaused) {
@@ -471,8 +530,8 @@ export default function InterviewPage() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Timer progress percentage
-  const timerProgress = (timeRemaining / 120) * 100;
+  // Timer progress percentage (5 minutes = 300 seconds)
+  const timerProgress = (timeRemaining / INTERVIEW_TIME_LIMIT) * 100;
 
   return (
     <PageTransition>
@@ -480,39 +539,34 @@ export default function InterviewPage() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-3 border-b border-border/50">
         <div className="flex items-center gap-3">
-          {interviewersList.map((interviewer) => (
-            <InterviewerAvatar
-              key={interviewer.id}
-              name={interviewer.name}
-              role={interviewer.role}
-              emoji={interviewer.emoji}
-              isActive={currentInterviewerId === interviewer.id}
-              isListening={currentInterviewerId === interviewer.id && (isRecording || isSpeaking)}
-              isThinking={currentInterviewerId === interviewer.id && isProcessing}
-            />
-          ))}
+          {interviewerTypes.map((type) => {
+            const interviewer = INTERVIEWER_BASE[type];
+            return (
+              <InterviewerAvatar
+                key={type}
+                name={interviewerNames[type]}
+                role={interviewer.role}
+                emoji={interviewer.emoji}
+                isActive={currentInterviewerId === type}
+                isListening={currentInterviewerId === type && (isRecording || isSpeaking)}
+                isThinking={currentInterviewerId === type && isProcessing}
+              />
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Turn counter */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/50">
-            <MessageCircle className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">
-              {turnCount}/{maxTurns}
+          {/* Timer */}
+          <div
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+              isInterviewStarted && timerWarning ? "bg-destructive/20 text-destructive" : "bg-secondary/50"
+            }`}
+          >
+            <Clock className={`w-4 h-4 ${isInterviewStarted && timerWarning ? "animate-pulse" : "text-muted-foreground"}`} />
+            <span className="text-sm font-medium tabular-nums">
+              {isInterviewStarted ? formatTime(timeRemaining) : "5:00"}
             </span>
           </div>
-
-          {/* Timer */}
-          {isInterviewStarted && timerActive && (
-            <div
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-                timerWarning ? "bg-destructive/20 text-destructive" : "bg-secondary/50"
-              }`}
-            >
-              <Clock className={`w-4 h-4 ${timerWarning ? "animate-pulse" : ""}`} />
-              <span className="text-sm font-medium tabular-nums">{formatTime(timeRemaining)}</span>
-            </div>
-          )}
 
           <Button variant="ghost" size="icon" onClick={() => setIsMuted(!isMuted)}>
             {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
@@ -523,9 +577,9 @@ export default function InterviewPage() {
               <Button variant="ghost" size="icon" onClick={togglePause}>
                 {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
               </Button>
-              <Button variant="destructive" onClick={endInterview} className="gap-2">
+              <Button variant="destructive" onClick={handleForceExit} className="gap-2">
                 <Phone className="w-4 h-4" />
-                면접 종료
+                면접 나가기
               </Button>
             </>
           )}
@@ -554,6 +608,52 @@ export default function InterviewPage() {
         )}
       </AnimatePresence>
 
+      {/* Exit Warning Modal */}
+      <AnimatePresence>
+        {showExitWarning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-card border border-border rounded-2xl p-8 max-w-md mx-4 text-center"
+            >
+              <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
+                <Phone className="w-8 h-8 text-destructive" />
+              </div>
+              <h2 className="text-2xl font-bold text-foreground mb-3">면접을 종료하시겠습니까?</h2>
+              <p className="text-muted-foreground mb-6">
+                지금 나가시면 <span className="text-destructive font-semibold">점수가 저장되지 않습니다.</span>
+                <br />
+                면접 결과 분석도 진행되지 않습니다.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowExitWarning(false)}
+                  className="gap-2"
+                >
+                  계속 진행
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmForceExit}
+                  className="gap-2"
+                >
+                  <Phone className="w-4 h-4" />
+                  나가기
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         {!isInterviewStarted ? (
@@ -565,15 +665,15 @@ export default function InterviewPage() {
               className="text-center max-w-lg"
             >
               <div className="flex justify-center gap-4 mb-8">
-                {interviewersList.map((interviewer, index) => (
+                {interviewerTypes.map((type, index) => (
                   <motion.div
-                    key={interviewer.id}
+                    key={type}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
                     className="w-20 h-20 rounded-2xl bg-gradient-to-br from-mint/20 to-soft-blue/20 flex items-center justify-center text-4xl"
                   >
-                    {interviewer.emoji}
+                    {INTERVIEWER_BASE[type].emoji}
                   </motion.div>
                 ))}
               </div>
@@ -599,56 +699,38 @@ export default function InterviewPage() {
         ) : (
           // Interview Screen
           <div className="h-full flex flex-col">
+            {/* AI Guidance Panel - Shows at interview start for 15 seconds */}
+            {showGuidance && (
+              <div className="p-6 pb-0">
+                <GuidancePanel
+                  tips={[
+                    { text: '구체적인 경험과 사례를 들어 설명하세요', type: 'detail' },
+                    { text: '정량적 결과나 수치를 포함하면 좋습니다', type: 'detail' },
+                    { text: '약 30초-1분 분량으로 답변해주세요', type: 'time' },
+                  ]}
+                  show={showGuidance}
+                />
+              </div>
+            )}
+
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.map((message, index) => {
-                const msgInterviewer = message.interviewerId
-                  ? INTERVIEWERS[message.interviewerId]
+              {messages.map((message) => {
+                const msgInterviewerType = message.interviewerId;
+                const msgInterviewer = msgInterviewerType
+                  ? INTERVIEWER_BASE[msgInterviewerType]
                   : null;
-                
-                // Check if this is the latest interviewer message
-                const isLatestInterviewerMsg = message.role === 'interviewer' && 
-                  index === messages.findLastIndex(m => m.role === 'interviewer');
-                
-                // Get previous user answer for context
-                const prevUserMsg = index > 0 && message.role === 'interviewer' 
-                  ? messages.slice(0, index).reverse().find(m => m.role === 'user')
+                const msgInterviewerName = msgInterviewerType
+                  ? interviewerNames[msgInterviewerType]
                   : null;
 
                 return (
-                  <div key={message.id}>
-                    {/* Show context and guidance before latest interviewer message */}
-                    {isLatestInterviewerMsg && (
-                      <>
-                        {/* Previous Answer Context */}
-                        {prevUserMsg && showContext && (
-                          <ContextReferenceCard
-                            previousAnswer={prevUserMsg.content}
-                            keywords={[]}
-                            expanded={expandedContext}
-                            onExpand={() => setExpandedContext(!expandedContext)}
-                          />
-                        )}
-                        
-                        {/* AI Guidance Panel */}
-                        {showGuidance && turnCount <= 3 && (
-                          <GuidancePanel
-                            tips={[
-                              { text: '구체적인 팀원 반응이나 피드백을 언급하세요', type: 'detail' },
-                              { text: '정량적 결과나 수치를 포함하면 좋습니다', type: 'detail' },
-                              { text: '약 30초-1분 분량으로 답변해주세요', type: 'time' },
-                            ]}
-                            show={showGuidance}
-                          />
-                        )}
-                      </>
-                    )}
-
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`flex gap-3 ${message.role === "user" ? "justify-end" : ""}`}
-                    >
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex gap-3 ${message.role === "user" ? "justify-end" : ""}`}
+                  >
                     {message.role === "interviewer" && msgInterviewer && (
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-mint/20 to-soft-blue/20 flex items-center justify-center text-xl shrink-0">
                         {msgInterviewer.emoji}
@@ -664,7 +746,7 @@ export default function InterviewPage() {
                       >
                         {message.role === "interviewer" && msgInterviewer && (
                           <p className="text-xs text-muted-foreground mb-1">
-                            {msgInterviewer.name} ({msgInterviewer.role})
+                            {msgInterviewerName} ({msgInterviewer.role})
                           </p>
                         )}
                         <p className={message.role === "user" ? "text-navy" : "text-foreground"}>
@@ -684,31 +766,6 @@ export default function InterviewPage() {
                           </p>
                         </motion.div>
                       )}
-                      
-                      {/* Evaluation feedback chips (for interviewer messages) */}
-                      {message.role === 'interviewer' && message.evaluation && (
-                        <div className="ml-4 mt-2">
-                          <RealTimeFeedback
-                            chips={[
-                              {
-                                label: '관련성',
-                                value: `${message.evaluation.relevance}점`,
-                                type: message.evaluation.relevance >= 80 ? 'excellent' : message.evaluation.relevance >= 60 ? 'good' : 'needs-work',
-                              },
-                              {
-                                label: '명확성',
-                                value: `${message.evaluation.clarity}점`,
-                                type: message.evaluation.clarity >= 80 ? 'excellent' : message.evaluation.clarity >= 60 ? 'good' : 'needs-work',
-                              },
-                              {
-                                label: '깊이',
-                                value: `${message.evaluation.depth}점`,
-                                type: message.evaluation.depth >= 80 ? 'excellent' : message.evaluation.depth >= 60 ? 'good' : 'needs-work',
-                              },
-                            ]}
-                          />
-                        </div>
-                      )}
                     </div>
                     {message.role === "user" && (
                       <div className="w-10 h-10 rounded-xl bg-mint/20 flex items-center justify-center shrink-0">
@@ -716,7 +773,6 @@ export default function InterviewPage() {
                       </div>
                     )}
                   </motion.div>
-                  </div>
                 );
               })}
 
@@ -862,7 +918,7 @@ export default function InterviewPage() {
                         type="text"
                         value={textInput}
                         onChange={(e) => setTextInput(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleTextSubmit()}
+                        onKeyDown={(e) => e.key === "Enter" && !isProcessing && handleTextSubmit()}
                         placeholder="텍스트로 답변 입력..."
                         disabled={isProcessing}
                         className="flex-1 px-4 py-3 rounded-xl bg-secondary/50 border border-border focus:border-mint focus:ring-1 focus:ring-mint outline-none transition-all placeholder:text-muted-foreground/50"

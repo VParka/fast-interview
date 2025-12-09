@@ -15,7 +15,7 @@ const painPoints = [
     icon: TrendingUp,
     title: "객관적 피드백 부재",
     before: "주관적이고 추상적인 피드백만 수령",
-    after: "8축 역량 분석 + 수치화된 성장 지표",
+    after: "5축 역량 분석 + 수치화된 성장 지표",
   },
   {
     icon: Zap,
@@ -115,7 +115,7 @@ export function ProductSection() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
             {[
               { value: "2초", label: "응답 지연시간", suffix: "미만" },
-              { value: "8가지", label: "역량 분석 축", suffix: "" },
+              { value: "5가지", label: "역량 분석 축", suffix: "" },
               { value: "3인", label: "AI 면접관", suffix: "동시 진행" },
               { value: "24/7", label: "연습 가능", suffix: "언제든지" },
             ].map((stat, index) => (

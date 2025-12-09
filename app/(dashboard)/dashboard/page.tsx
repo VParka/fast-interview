@@ -33,7 +33,20 @@ import {
 } from "recharts";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { JOB_TYPES } from "@/types/interview";
-import type { CompetencyScores } from "@/types/interview";
+
+// 5축 핵심 역량 라벨
+const CATEGORY_LABELS: Record<string, string> = {
+  logical_structure: "논리적 구조",
+  job_expertise: "직무 전문성",
+  attitude_communication: "태도/커뮤니케이션",
+  company_fit: "회사 적합도",
+  growth_potential: "성장 가능성",
+};
+
+interface CategoryScore {
+  score: number;
+  reasoning: string;
+}
 
 interface InterviewSession {
   id: string;
@@ -49,7 +62,13 @@ interface InterviewResult {
   session_id: string;
   overall_score: number;
   pass_status: string;
-  competency_scores: CompetencyScores;
+  category_scores?: {
+    logical_structure: CategoryScore;
+    job_expertise: CategoryScore;
+    attitude_communication: CategoryScore;
+    company_fit: CategoryScore;
+    growth_potential: CategoryScore;
+  };
   created_at: string;
   interview_sessions?: InterviewSession;
 }
@@ -62,17 +81,6 @@ interface DashboardStats {
   scoreChange: number;
   interviewChange: number;
 }
-
-const COMPETENCY_LABELS: Record<keyof CompetencyScores, string> = {
-  behavioral: "행동역량",
-  clarity: "명확성",
-  comprehension: "이해력",
-  communication: "커뮤니케이션",
-  reasoning: "논리적사고",
-  problem_solving: "문제해결",
-  leadership: "리더십",
-  adaptability: "적응력",
-};
 
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -163,27 +171,29 @@ export default function DashboardPage() {
           score: r.overall_score,
         }));
 
-      // Average competency scores
-      const competencyTotals: Record<string, number> = {};
-      const competencyKeys = Object.keys(COMPETENCY_LABELS) as Array<
-        keyof CompetencyScores
-      >;
+      // Average category scores (5-axis)
+      const categoryTotals: Record<string, number> = {};
+      const categoryKeys = Object.keys(CATEGORY_LABELS);
 
-      competencyKeys.forEach((key) => {
-        competencyTotals[key] = 0;
+      categoryKeys.forEach((key) => {
+        categoryTotals[key] = 0;
       });
 
+      let resultsWithScores = 0;
       typedResults.forEach((r) => {
-        if (r.competency_scores) {
-          competencyKeys.forEach((key) => {
-            competencyTotals[key] += r.competency_scores[key] || 0;
+        if (r.category_scores) {
+          resultsWithScores++;
+          categoryKeys.forEach((key) => {
+            const score = r.category_scores?.[key as keyof typeof r.category_scores]?.score || 0;
+            // Convert 1-5 scale to percentage
+            categoryTotals[key] += Math.round(((score - 1) / 4) * 100);
           });
         }
       });
 
-      const avgCompetencyData = competencyKeys.map((key) => ({
-        subject: COMPETENCY_LABELS[key],
-        score: Math.round(competencyTotals[key] / totalInterviews),
+      const avgCompetencyData = categoryKeys.map((key) => ({
+        subject: CATEGORY_LABELS[key],
+        score: resultsWithScores > 0 ? Math.round(categoryTotals[key] / resultsWithScores) : 0,
       }));
 
       setStats({
@@ -218,14 +228,11 @@ export default function DashboardPage() {
     setRecentResults([]);
     setScoreHistory([]);
     setAvgCompetency([
-      { subject: "행동역량", score: 0 },
-      { subject: "명확성", score: 0 },
-      { subject: "이해력", score: 0 },
-      { subject: "커뮤니케이션", score: 0 },
-      { subject: "논리적사고", score: 0 },
-      { subject: "문제해결", score: 0 },
-      { subject: "리더십", score: 0 },
-      { subject: "적응력", score: 0 },
+      { subject: "논리적 구조", score: 0 },
+      { subject: "직무 전문성", score: 0 },
+      { subject: "태도/커뮤니케이션", score: 0 },
+      { subject: "회사 적합도", score: 0 },
+      { subject: "성장 가능성", score: 0 },
     ]);
     setIsLoading(false);
   };

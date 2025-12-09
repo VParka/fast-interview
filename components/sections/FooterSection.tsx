@@ -62,7 +62,7 @@ export function FooterSection() {
 
               <p className="text-muted-foreground mb-6 max-w-sm">
                 AI 기반 멀티 면접관 모의 면접 시스템.
-                실시간 음성 인터랙션과 8축 역량 분석으로
+                실시간 음성 인터랙션과 5축 역량 분석으로
                 면접 실력을 극대화하세요.
               </p>
 
