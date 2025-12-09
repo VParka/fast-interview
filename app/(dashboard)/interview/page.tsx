@@ -19,7 +19,6 @@ import {
   Send,
 } from "lucide-react";
 import { INTERVIEWER_BASE, type InterviewerType, type SessionInterviewerNames } from "@/types/interview";
-import { GuidancePanel } from "@/components/interview/GuidancePanel";
 import { InterviewerAvatar } from "@/components/interview/InterviewerAvatar";
 import { VoiceVisualizer } from "@/components/interview/VoiceVisualizer";
 import { PageTransition } from "@/components/ui/PageTransition";
@@ -70,9 +69,8 @@ export default function InterviewPage() {
   const [showTextInput, setShowTextInput] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
 
-  // UI state
-  const [showGuidance, setShowGuidance] = useState(true);
-  const [guidanceTimerStarted, setGuidanceTimerStarted] = useState(false);
+  // Guide overlay state - shows BEFORE interview starts
+  const [showStartGuide, setShowStartGuide] = useState(false);
 
   // Interviewer names from DB (random per session)
   const [interviewerNames, setInterviewerNames] = useState<SessionInterviewerNames>({
@@ -95,7 +93,6 @@ export default function InterviewPage() {
   const animationFrameRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const guidanceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentInterviewer = INTERVIEWER_BASE[currentInterviewerId];
 
@@ -129,22 +126,6 @@ export default function InterviewPage() {
       }
     };
   }, [timerActive, isPaused, isRecording]);
-
-  // Auto-hide guidance after 10 seconds when interview starts
-  useEffect(() => {
-    if (isInterviewStarted && showGuidance && !guidanceTimerStarted) {
-      setGuidanceTimerStarted(true);
-      guidanceTimerRef.current = setTimeout(() => {
-        setShowGuidance(false);
-      }, 10000); // 10 seconds
-    }
-
-    return () => {
-      if (guidanceTimerRef.current) {
-        clearTimeout(guidanceTimerRef.current);
-      }
-    };
-  }, [isInterviewStarted, showGuidance, guidanceTimerStarted]);
 
   // Load session from sessionStorage on mount
   useEffect(() => {
@@ -401,6 +382,16 @@ export default function InterviewPage() {
     }
   };
 
+  // Show guide overlay first, then start interview
+  const handleStartClick = () => {
+    setShowStartGuide(true);
+    // Auto-dismiss guide after 5 seconds and start interview
+    setTimeout(() => {
+      setShowStartGuide(false);
+      startInterview();
+    }, 5000);
+  };
+
   const startInterview = async () => {
     setIsInterviewStarted(true);
     setIsProcessing(true);
@@ -654,6 +645,45 @@ export default function InterviewPage() {
         )}
       </AnimatePresence>
 
+      {/* Pre-Interview Guide Overlay - Shows for 5 seconds before interview starts */}
+      <AnimatePresence>
+        {showStartGuide && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-card border border-mint/30 rounded-2xl p-8 max-w-lg mx-4 text-center shadow-lg shadow-mint/10"
+            >
+              <div className="w-16 h-16 rounded-full bg-mint/20 flex items-center justify-center mx-auto mb-4">
+                <MessageCircle className="w-8 h-8 text-mint" />
+              </div>
+              <h2 className="text-2xl font-bold text-foreground mb-4">답변 팁</h2>
+              <div className="space-y-3 text-left mb-6">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50">
+                  <span className="text-mint text-lg">💡</span>
+                  <p className="text-foreground">구체적인 경험과 사례를 들어 설명하세요</p>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50">
+                  <span className="text-mint text-lg">📊</span>
+                  <p className="text-foreground">정량적 결과나 수치를 포함하면 좋습니다</p>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50">
+                  <span className="text-mint text-lg">⏱️</span>
+                  <p className="text-foreground">약 30초-1분 분량으로 답변해주세요</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">5초 후 면접이 시작됩니다...</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         {!isInterviewStarted ? (
@@ -693,7 +723,7 @@ export default function InterviewPage() {
                 >
                   설정 변경
                 </Button>
-                <Button variant="mint" size="xl" onClick={startInterview} className="gap-2">
+                <Button variant="mint" size="xl" onClick={handleStartClick} className="gap-2">
                   <Mic className="w-5 h-5" />
                   면접 시작하기
                 </Button>
@@ -701,22 +731,8 @@ export default function InterviewPage() {
             </motion.div>
           </div>
         ) : (
-          // Interview Screen
+          // Interview Screen - No guidance panel here, it shows before interview starts
           <div className="h-full flex flex-col">
-            {/* AI Guidance Panel - Shows at interview start for 10 seconds then disappears */}
-            {showGuidance && (
-              <div className="p-6 pb-0">
-                <GuidancePanel
-                  tips={[
-                    { text: '구체적인 경험과 사례를 들어 설명하세요', type: 'detail' },
-                    { text: '정량적 결과나 수치를 포함하면 좋습니다', type: 'detail' },
-                    { text: '약 30초-1분 분량으로 답변해주세요', type: 'time' },
-                  ]}
-                  show={true}
-                />
-              </div>
-            )}
-
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.map((message) => {
