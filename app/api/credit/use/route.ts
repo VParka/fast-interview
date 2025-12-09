@@ -4,8 +4,8 @@ import { createServerClient } from '@supabase/ssr';
 
 const DEFAULT_REASON = 'AI_USE';
 
-function createSupabaseServerClient() {
-  const cookieStore = cookies();
+async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,7 +24,7 @@ function createSupabaseServerClient() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authData?.user) {

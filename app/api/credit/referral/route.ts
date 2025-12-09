@@ -5,8 +5,8 @@ import { createServerClient } from '@supabase/ssr';
 const REFERRAL_SELF_AMOUNT = Number(process.env.REFERRAL_SELF_AMOUNT ?? 20);
 const REFERRAL_REFERRER_AMOUNT = Number(process.env.REFERRAL_REFERRER_AMOUNT ?? 30);
 
-function createSupabaseServerClient() {
-  const cookieStore = cookies();
+async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,7 +25,7 @@ function createSupabaseServerClient() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authData?.user) {

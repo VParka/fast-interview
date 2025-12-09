@@ -101,7 +101,29 @@ export default function DashboardPage() {
   >([]);
 
   useEffect(() => {
-    fetchDashboardData();
+    let isMounted = true;
+
+    const loadData = async () => {
+      // Add timeout wrapper to prevent infinite loading
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 15000);
+      });
+
+      try {
+        await Promise.race([fetchDashboardData(), timeoutPromise]);
+      } catch (error) {
+        console.error('Dashboard data load error:', error);
+        if (isMounted) {
+          setDemoData();
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const fetchDashboardData = async () => {

@@ -66,7 +66,31 @@ export default function HistoryPage() {
   const supabase = createBrowserSupabaseClient();
 
   useEffect(() => {
-    fetchHistory();
+    let isMounted = true;
+
+    const loadData = async () => {
+      // Add timeout wrapper to prevent infinite loading
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 15000);
+      });
+
+      try {
+        await Promise.race([fetchHistory(), timeoutPromise]);
+      } catch (error) {
+        console.error('History data load error:', error);
+        if (isMounted) {
+          setSessions([]);
+          setResults({});
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const fetchHistory = async () => {

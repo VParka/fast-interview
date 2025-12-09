@@ -43,22 +43,53 @@ export default function DashboardLayout({
   const supabase = createBrowserSupabaseClient();
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      try {
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-      if (authUser) {
-        // Get profile data
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", authUser.id)
-          .single() as { data: { full_name?: string } | null };
+        if (authError) {
+          console.error('Auth error in layout:', authError);
+          return;
+        }
 
-        setUser({
-          id: authUser.id,
-          email: authUser.email || "",
-          full_name: profile?.full_name || authUser.user_metadata?.full_name,
-        });
+        if (authUser && isMounted) {
+          // Get profile data with timeout
+          const profilePromise = supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", authUser.id)
+            .single();
+
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Profile fetch timeout')), 10000);
+          });
+
+          try {
+            const { data: profile } = await Promise.race([profilePromise, timeoutPromise]) as { data: { full_name?: string } | null };
+
+            if (isMounted) {
+              setUser({
+                id: authUser.id,
+                email: authUser.email || "",
+                full_name: profile?.full_name || authUser.user_metadata?.full_name,
+              });
+            }
+          } catch (profileError) {
+            console.error('Profile fetch error:', profileError);
+            // Still set user with basic info even if profile fetch fails
+            if (isMounted) {
+              setUser({
+                id: authUser.id,
+                email: authUser.email || "",
+                full_name: authUser.user_metadata?.full_name,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error);
       }
     };
 
@@ -67,26 +98,44 @@ export default function DashboardLayout({
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return;
+
         if (event === "SIGNED_OUT") {
           setUser(null);
           window.location.href = "/login";
         } else if (session?.user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", session.user.id)
-            .single() as { data: { full_name?: string } | null };
+          try {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("id", session.user.id)
+              .single() as { data: { full_name?: string } | null };
 
-          setUser({
-            id: session.user.id,
-            email: session.user.email || "",
-            full_name: profile?.full_name || session.user.user_metadata?.full_name,
-          });
+            if (isMounted) {
+              setUser({
+                id: session.user.id,
+                email: session.user.email || "",
+                full_name: profile?.full_name || session.user.user_metadata?.full_name,
+              });
+            }
+          } catch (error) {
+            console.error('Profile fetch error on auth change:', error);
+            if (isMounted) {
+              setUser({
+                id: session.user.id,
+                email: session.user.email || "",
+                full_name: session.user.user_metadata?.full_name,
+              });
+            }
+          }
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

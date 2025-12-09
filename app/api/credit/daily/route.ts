@@ -5,8 +5,8 @@ import { createServerClient } from '@supabase/ssr';
 const DAILY_REWARD_AMOUNT = Number(process.env.DAILY_REWARD_AMOUNT ?? 10);
 const DAILY_MIN_INTERVAL_HOURS = Number(process.env.DAILY_REWARD_INTERVAL_HOURS ?? 24);
 
-function createSupabaseServerClient() {
-  const cookieStore = cookies();
+async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,7 +25,7 @@ function createSupabaseServerClient() {
 }
 
 export async function POST(_req: NextRequest) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
