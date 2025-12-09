@@ -214,7 +214,12 @@ export default function InterviewSetupPage() {
       formData.append("file", file);
       formData.append("type", type);
 
-      const response = await fetch("/api/rag/upload", {
+      // 항상 HTTPS 사용 (HTTP→HTTPS 리다이렉트 시 POST→GET 변환 방지)
+      const baseUrl = typeof window !== 'undefined' && window.location.protocol === 'http:'
+        ? window.location.href.replace('http:', 'https:').split('/').slice(0, 3).join('/')
+        : '';
+
+      const response = await fetch(`${baseUrl}/api/rag/upload`, {
         method: "POST",
         body: formData,
       });
