@@ -19,6 +19,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
+  ClipboardList,
 } from "lucide-react";
 import { DIFFICULTY_LEVELS } from "@/types/interview";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
@@ -52,6 +53,7 @@ interface UploadedFile {
 }
 
 interface SetupState {
+  jdText: string;
   jobType: string;
   industry: string;
   difficulty: "easy" | "medium" | "hard";
@@ -78,6 +80,7 @@ export default function InterviewSetupPage() {
   const [showAllIndustries, setShowAllIndustries] = useState(false);
 
   const [setup, setSetup] = useState<SetupState>({
+    jdText: "",
     jobType: "",
     industry: "",
     difficulty: "medium",
@@ -278,6 +281,7 @@ export default function InterviewSetupPage() {
           difficulty: setup.difficulty,
           resume_doc_id: setup.resume?.docId || null,
           portfolio_doc_id: setup.portfolio?.docId || null,
+          jd_text: setup.jdText || null,
         }),
       });
 
@@ -332,6 +336,38 @@ export default function InterviewSetupPage() {
 
         {/* Setup Cards */}
         <div className="space-y-4 sm:space-y-6">
+          {/* JD (Job Description) Input */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+          >
+            <Card className="p-4 sm:p-6">
+              <div className="flex items-center gap-2 sm:gap-3 mb-4">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                  <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-medium text-sm sm:text-base text-foreground">채용공고 (JD)</h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    선택사항 - 채용공고의 자격요건/우대사항을 붙여넣으세요
+                  </p>
+                </div>
+              </div>
+              <textarea
+                value={setup.jdText}
+                onChange={(e) => setSetup((prev) => ({ ...prev, jdText: e.target.value }))}
+                placeholder={`채용공고에서 자격요건, 우대사항, 주요업무 등을 복사해서 붙여넣으세요.\n\n예시:\n• React, TypeScript 경험 3년 이상\n• RESTful API 설계 경험\n• 애자일 환경에서의 협업 경험`}
+                className="w-full h-32 sm:h-40 p-3 sm:p-4 rounded-lg sm:rounded-xl bg-secondary/50 text-sm text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/50 transition-all"
+              />
+              {setup.jdText && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {setup.jdText.length}자 입력됨
+                </p>
+              )}
+            </Card>
+          </motion.div>
+
           {/* Job Type Selection */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

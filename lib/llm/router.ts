@@ -32,6 +32,7 @@ export interface LLMRequest {
   // New fields for enhanced logic
   previousInterviewerId?: InterviewerType; // For follow-up logic
   interviewerMbti?: MBTIType; // Pre-assigned MBTI for the session
+  jdText?: string; // Job description for targeted questions
 }
 
 // User keyword from previous interviews
@@ -110,7 +111,8 @@ export class LLMRouter {
       request.difficulty,
       request.turnCount,
       request.previousInterviewerId,
-      request.interviewerId
+      request.interviewerId,
+      request.jdText
     );
 
     // Limit conversation history to last 3 turns (6 messages: 3 user + 3 assistant)
@@ -167,9 +169,22 @@ export class LLMRouter {
     difficulty?: 'easy' | 'medium' | 'hard',
     turnCount?: number,
     previousInterviewerId?: InterviewerType,
-    currentInterviewerId?: InterviewerType
+    currentInterviewerId?: InterviewerType,
+    jdText?: string
   ): string {
     let prompt = basePrompt;
+
+    // Add JD context FIRST (priority)
+    if (jdText) {
+      prompt += `
+
+## [중요] 채용공고 요구사항 (JD)
+아래 자격요건/우대사항을 반드시 참고하여 질문하세요.
+
+${jdText}
+
+→ JD 요구사항 충족 여부를 검증하는 질문을 우선하세요.`;
+    }
 
     // Add difficulty context
     prompt += `
@@ -220,13 +235,20 @@ ${this.formatKeywords(userKeywords)}`;
       }
     }
 
-    // Core instructions
+    // Core instructions with anti-repetition
     prompt += `
 
 ## 핵심 지침
-- 이전 대화 맥락을 참조하여 질문하세요
 - 1-2문장의 간결한 질문
-- 한국어로 자연스럽게 대화`;
+- 한국어로 자연스럽게 대화
+
+## [필수] 반복 금지
+- 이미 한 질문 또는 지원자가 답한 내용 재질문 금지
+- 같은 주제 충분히 다뤘으면 새 주제로 전환
+
+## [절대 금지] 에코 금지
+- 절대로 지원자의 답변을 그대로 출력하지 마세요
+- 당신은 면접관입니다. 오직 새로운 질문만 출력하세요`;
 
     return prompt;
   }
@@ -352,6 +374,7 @@ export async function generateInterviewerResponse(
     turnCount?: number;
     previousInterviewerId?: InterviewerType;
     interviewerMbti?: MBTIType;
+    jdText?: string;
   }
 ): Promise<LLMResponse> {
   return llmRouter.generateResponse({

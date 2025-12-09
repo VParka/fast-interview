@@ -211,10 +211,12 @@ export async function POST(req: NextRequest) {
     interface SessionMetadata {
       interviewer_mbti?: Record<InterviewerType, MBTIType>;
       interviewer_names?: Record<InterviewerType, string>;
+      jd_text?: string;
     }
     const sessionMetadata = (session.timer_config as unknown as SessionMetadata) || {};
     const interviewerMbti = sessionMetadata.interviewer_mbti?.[nextInterviewerId] as MBTIType | undefined;
     const interviewerName = sessionMetadata.interviewer_names?.[nextInterviewerId] || interviewerBase.name;
+    const jdText = sessionMetadata.jd_text;
 
     // Get relevant context from RAG (both resume and portfolio)
     const contextParts: string[] = [];
@@ -290,6 +292,7 @@ export async function POST(req: NextRequest) {
         // If forced new topic, also indicate to generate completely new question
         previousInterviewerId: (isFollowUp && !shouldForceNewTopic) ? undefined : currentInterviewerId,
         interviewerMbti,
+        jdText: jdText || undefined,
       }
     );
     console.log('LLM response generated:', {
