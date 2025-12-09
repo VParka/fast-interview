@@ -19,15 +19,13 @@ import {
 } from "recharts";
 import { TrendingUp, Activity, MessageSquare, Target } from "lucide-react";
 
+// 5축 핵심 역량 데이터
 const radarData = [
-  { axis: "기술역량", score: 85, fullMark: 100 },
-  { axis: "문제해결", score: 78, fullMark: 100 },
-  { axis: "커뮤니케이션", score: 92, fullMark: 100 },
-  { axis: "리더십", score: 70, fullMark: 100 },
-  { axis: "창의성", score: 88, fullMark: 100 },
-  { axis: "적응력", score: 82, fullMark: 100 },
-  { axis: "협업능력", score: 90, fullMark: 100 },
-  { axis: "전문성", score: 75, fullMark: 100 },
+  { axis: "논리적 구조", score: 85, fullMark: 100 },
+  { axis: "직무 전문성", score: 78, fullMark: 100 },
+  { axis: "태도/커뮤니케이션", score: 92, fullMark: 100 },
+  { axis: "회사 적합도", score: 82, fullMark: 100 },
+  { axis: "성장 가능성", score: 88, fullMark: 100 },
 ];
 
 const emotionData = [
@@ -78,7 +76,7 @@ export function AnalyticsSection() {
             <span className="text-gradient-mint">역량 분석</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            8축 역량 분석, 감정 트래킹, 스피치 분석으로
+            5축 핵심 역량 분석, 감정 트래킹, 스피치 분석으로
             객관적이고 정량화된 피드백을 제공합니다.
           </p>
         </motion.div>
@@ -98,7 +96,7 @@ export function AnalyticsSection() {
               </div>
               <div>
                 <h3 className="font-display text-xl font-semibold text-foreground">
-                  8축 역량 분석
+                  5축 핵심 역량 분석
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   종합 역량 점수: 82.5점

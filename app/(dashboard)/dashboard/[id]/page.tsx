@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -41,8 +41,19 @@ import {
   BarChart3,
   Users,
   Crown,
+  Eye,
+  EyeOff,
 } from "lucide-react";
-import { INTERVIEWERS, COMPETENCY_LABELS, type CompetencyScores, type InterviewerType } from "@/types/interview";
+import { INTERVIEWERS, type InterviewerType } from "@/types/interview";
+
+// 5축 핵심 역량 라벨
+const CATEGORY_LABELS: Record<string, string> = {
+  logical_structure: "논리적 구조",
+  job_expertise: "직무 전문성",
+  attitude_communication: "태도/커뮤니케이션",
+  company_fit: "회사 적합도",
+  growth_potential: "성장 가능성",
+};
 
 // Bell Curve (Normal Distribution) Component
 interface BellCurveProps {
@@ -187,13 +198,87 @@ function LockedSection({ title, description, icon, onUnlock }: LockedSectionProp
   );
 }
 
+// Blur Reveal Component - Click to reveal scores
+interface BlurRevealProps {
+  children: React.ReactNode;
+  isRevealed: boolean;
+  onReveal: () => void;
+  revealText?: string;
+}
+
+function BlurReveal({ children, isRevealed, onReveal, revealText = "클릭하여 결과 확인" }: BlurRevealProps) {
+  return (
+    <div className="relative">
+      <AnimatePresence mode="wait">
+        {!isRevealed ? (
+          <motion.div
+            key="blurred"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative cursor-pointer group"
+            onClick={onReveal}
+          >
+            {/* Blurred content */}
+            <div className="filter blur-lg select-none pointer-events-none">
+              {children}
+            </div>
+
+            {/* Overlay with reveal prompt */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm rounded-3xl"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="flex flex-col items-center gap-4"
+              >
+                <div className="w-20 h-20 rounded-full bg-mint/20 flex items-center justify-center border-2 border-mint/30 group-hover:border-mint group-hover:bg-mint/30 transition-all">
+                  <Eye className="w-10 h-10 text-mint" />
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-foreground mb-1">{revealText}</p>
+                  <p className="text-sm text-muted-foreground">터치하여 면접 결과를 확인하세요</p>
+                </div>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="revealed"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Category score with reasoning
+interface CategoryScore {
+  score: number;
+  reasoning: string;
+}
+
 interface InterviewResult {
   id: string;
   session_id: string;
   overall_score: number;
   pass_status: "pass" | "borderline" | "fail";
   interviewer_scores: Record<string, number>;
-  competency_scores: CompetencyScores;
+  interviewer_comments?: Record<string, string>;
+  category_scores?: {
+    logical_structure: CategoryScore;
+    job_expertise: CategoryScore;
+    attitude_communication: CategoryScore;
+    company_fit: CategoryScore;
+    growth_potential: CategoryScore;
+  };
   rank_percentile?: number;
   growth_index?: number;
   feedback_summary: string;
@@ -204,44 +289,29 @@ interface InterviewResult {
   created_at: string;
 }
 
-// Mock data fallback
-const mockResult: InterviewResult = {
-  id: "1",
-  session_id: "session-1",
-  overall_score: 85,
-  pass_status: "pass",
+// No mock data - use actual DB scores only
+const createEmptyResult = (sessionId: string): InterviewResult => ({
+  id: sessionId,
+  session_id: sessionId,
+  overall_score: 0,
+  pass_status: "borderline",
   interviewer_scores: {
-    hiring_manager: 87,
-    hr_manager: 85,
-    senior_peer: 83,
+    hiring_manager: 0,
+    hr_manager: 0,
+    senior_peer: 0,
   },
-  competency_scores: {
-    behavioral: 88,
-    clarity: 82,
-    comprehension: 90,
-    communication: 85,
-    reasoning: 80,
-    problem_solving: 78,
-    leadership: 75,
-    adaptability: 82,
+  category_scores: {
+    logical_structure: { score: 0, reasoning: "" },
+    job_expertise: { score: 0, reasoning: "" },
+    attitude_communication: { score: 0, reasoning: "" },
+    company_fit: { score: 0, reasoning: "" },
+    growth_potential: { score: 0, reasoning: "" },
   },
-  rank_percentile: 15,
-  growth_index: 8,
-  feedback_summary: "전반적으로 우수한 면접 성과를 보여주셨습니다. 특히 기술적 이해도와 커뮤니케이션 능력이 돋보였으며, 문제 해결 접근 방식도 논리적이었습니다.",
-  strengths: [
-    "기술 스택에 대한 깊은 이해와 실무 경험이 잘 드러남",
-    "질문의 의도를 빠르게 파악하고 구조화된 답변 제시",
-    "팀워크와 협업에 대한 긍정적인 마인드셋",
-  ],
-  improvements: [
-    "STAR 기법을 활용한 답변 구조화 연습이 필요합니다.",
-    "기술 트레이드오프 설명 시 더 구체적인 수치를 활용해보세요.",
-    "답변 시간을 조금 더 간결하게 조절하면 좋겠습니다.",
-  ],
-  turn_count: 10,
-  duration_minutes: 25,
+  feedback_summary: "결과를 불러오는 중...",
+  strengths: [],
+  improvements: [],
   created_at: new Date().toISOString(),
-};
+});
 
 export default function InterviewResultPage() {
   const params = useParams();
@@ -251,6 +321,7 @@ export default function InterviewResultPage() {
   const [result, setResult] = useState<InterviewResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     competency: true,
     interviewers: true,
@@ -263,18 +334,132 @@ export default function InterviewResultPage() {
     router.push("/pricing");
   };
 
+  // Handle reveal click
+  const handleReveal = () => {
+    setIsRevealed(true);
+  };
+
   useEffect(() => {
-    // Try to get result from sessionStorage first
-    const storedResult = sessionStorage.getItem("interviewResult");
-    if (storedResult) {
-      setResult(JSON.parse(storedResult));
-      sessionStorage.removeItem("interviewResult");
-      setLoading(false);
-    } else {
-      // Use mock data for demo (in production, fetch from API)
-      setResult(mockResult);
-      setLoading(false);
-    }
+    const fetchResult = async () => {
+      // Try to get result from sessionStorage first (from interview end)
+      const storedResult = sessionStorage.getItem("interviewResult");
+      if (storedResult) {
+        const parsed = JSON.parse(storedResult);
+        setResult(parsed);
+        sessionStorage.removeItem("interviewResult");
+        setLoading(false);
+        return;
+      }
+
+      // Fetch from database
+      try {
+        const { createBrowserSupabaseClient } = await import("@/lib/supabase/client");
+        const supabase = createBrowserSupabaseClient();
+
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setResult(createEmptyResult(resultId));
+          setLoading(false);
+          return;
+        }
+
+        // Fetch result by session_id
+        const { data: resultData, error } = await supabase
+          .from("interview_results")
+          .select(`
+            *,
+            interview_sessions (
+              id,
+              job_type,
+              difficulty,
+              turn_count,
+              created_at
+            )
+          `)
+          .eq("session_id", resultId)
+          .eq("user_id", user.id)
+          .single();
+
+        if (error || !resultData) {
+          console.error("Error fetching result:", error);
+          setResult(createEmptyResult(resultId));
+          setLoading(false);
+          return;
+        }
+
+        // Type assertion for resultData
+        const data = resultData as {
+          id: string;
+          session_id: string;
+          overall_score: number;
+          pass_status: "pass" | "borderline" | "fail";
+          interviewer_scores?: Record<string, number>;
+          interviewer_comments?: Record<string, string>;
+          category_scores?: {
+            logical_structure: CategoryScore;
+            job_expertise: CategoryScore;
+            attitude_communication: CategoryScore;
+            company_fit: CategoryScore;
+            growth_potential: CategoryScore;
+          };
+          rank_percentile?: number;
+          growth_index?: number;
+          feedback_summary?: string;
+          feedback?: string;
+          strengths?: string[];
+          improvements?: string[];
+          created_at: string;
+          interview_sessions?: {
+            id: string;
+            job_type: string;
+            difficulty: string;
+            turn_count: number;
+            created_at: string;
+          };
+        };
+
+        // Transform to InterviewResult format - use ACTUAL DB scores only
+        const transformedResult: InterviewResult = {
+          id: data.id,
+          session_id: data.session_id,
+          overall_score: data.overall_score,
+          pass_status: data.pass_status,
+          interviewer_scores: data.interviewer_scores || {
+            hiring_manager: 0,
+            hr_manager: 0,
+            senior_peer: 0,
+          },
+          interviewer_comments: data.interviewer_comments,
+          category_scores: data.category_scores || {
+            logical_structure: { score: 0, reasoning: "" },
+            job_expertise: { score: 0, reasoning: "" },
+            attitude_communication: { score: 0, reasoning: "" },
+            company_fit: { score: 0, reasoning: "" },
+            growth_potential: { score: 0, reasoning: "" },
+          },
+          rank_percentile: data.rank_percentile,
+          growth_index: data.growth_index,
+          feedback_summary: data.feedback_summary || data.feedback || "평가 결과가 없습니다.",
+          strengths: data.strengths || [],
+          improvements: data.improvements || [],
+          turn_count: data.interview_sessions?.turn_count,
+          duration_minutes: data.interview_sessions?.turn_count
+            ? Math.round(data.interview_sessions.turn_count * 2.5)
+            : undefined,
+          created_at: data.created_at,
+        };
+
+        setResult(transformedResult);
+      } catch (error) {
+        console.error("Error fetching result:", error);
+        setResult(createEmptyResult(resultId));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchResult();
   }, [resultId]);
 
   const toggleSection = (section: string) => {
@@ -310,12 +495,14 @@ export default function InterviewResultPage() {
     );
   }
 
-  // Prepare radar chart data
-  const radarData = Object.entries(result.competency_scores).map(([key, value]) => ({
-    skill: COMPETENCY_LABELS[key as keyof CompetencyScores],
-    value,
-    fullMark: 100,
-  }));
+  // Prepare radar chart data - Convert 5-axis category scores (1-5 scale) to percentage
+  const radarData = result.category_scores
+    ? Object.entries(result.category_scores).map(([key, value]) => ({
+        skill: CATEGORY_LABELS[key] || key,
+        value: Math.round(((value.score - 1) / 4) * 100), // Convert 1-5 to 0-100
+        fullMark: 100,
+      }))
+    : [];
 
   // Status colors and icons
   const statusConfig = {
@@ -367,68 +554,69 @@ export default function InterviewResultPage() {
         </div>
       </div>
 
-      {/* Score Overview */}
-      <div className="grid lg:grid-cols-3 gap-8 mb-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="lg:col-span-1"
-        >
-          <div className="glass-card rounded-3xl p-8 text-center">
-            {/* Score Circle */}
-            <div className="relative inline-block mb-6">
-              <svg className="w-40 h-40 transform -rotate-90">
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="70"
-                  fill="none"
-                  stroke="hsl(var(--secondary))"
-                  strokeWidth="12"
-                />
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="70"
-                  fill="none"
-                  stroke="hsl(var(--mint))"
-                  strokeWidth="12"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(result.overall_score / 100) * 440} 440`}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-display text-4xl font-bold text-foreground">
-                  {result.overall_score}
-                </span>
-                <span className="text-sm text-muted-foreground">종합 점수</span>
+      {/* Score Overview - Wrapped in BlurReveal */}
+      <BlurReveal isRevealed={isRevealed} onReveal={handleReveal} revealText="면접 결과 확인하기">
+        <div className="grid lg:grid-cols-3 gap-8 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="lg:col-span-1"
+          >
+            <div className="glass-card rounded-3xl p-8 text-center">
+              {/* Score Circle */}
+              <div className="relative inline-block mb-6">
+                <svg className="w-40 h-40 transform -rotate-90">
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="70"
+                    fill="none"
+                    stroke="hsl(var(--secondary))"
+                    strokeWidth="12"
+                  />
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="70"
+                    fill="none"
+                    stroke="hsl(var(--mint))"
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(result.overall_score / 100) * 440} 440`}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-display text-4xl font-bold text-foreground">
+                    {result.overall_score}
+                  </span>
+                  <span className="text-sm text-muted-foreground">종합 점수</span>
+                </div>
               </div>
+
+              {/* Rank */}
+              {result.rank_percentile !== undefined && (
+                <div className="flex items-center justify-center gap-2 text-mint mb-4">
+                  <Trophy className="w-5 h-5" />
+                  <span className="font-medium">상위 {100 - result.rank_percentile}%</span>
+                </div>
+              )}
+
+              {/* Growth Index */}
+              {result.growth_index !== undefined && (
+                <div className={`flex items-center justify-center gap-2 ${result.growth_index >= 0 ? "text-green-500" : "text-destructive"}`}>
+                  {result.growth_index >= 0 ? (
+                    <TrendingUp className="w-4 h-4" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4" />
+                  )}
+                  <span className="text-sm">
+                    이전 대비 {result.growth_index >= 0 ? "+" : ""}{result.growth_index}%
+                  </span>
+                </div>
+              )}
             </div>
-
-            {/* Rank */}
-            {result.rank_percentile !== undefined && (
-              <div className="flex items-center justify-center gap-2 text-mint mb-4">
-                <Trophy className="w-5 h-5" />
-                <span className="font-medium">상위 {100 - result.rank_percentile}%</span>
-              </div>
-            )}
-
-            {/* Growth Index */}
-            {result.growth_index !== undefined && (
-              <div className={`flex items-center justify-center gap-2 ${result.growth_index >= 0 ? "text-green-500" : "text-destructive"}`}>
-                {result.growth_index >= 0 ? (
-                  <TrendingUp className="w-4 h-4" />
-                ) : (
-                  <TrendingDown className="w-4 h-4" />
-                )}
-                <span className="text-sm">
-                  이전 대비 {result.growth_index >= 0 ? "+" : ""}{result.growth_index}%
-                </span>
-              </div>
-            )}
-          </div>
-        </motion.div>
+          </motion.div>
 
         {/* Radar Chart */}
         <motion.div
@@ -441,7 +629,7 @@ export default function InterviewResultPage() {
             <div className="flex items-center gap-3 mb-6">
               <Sparkles className="w-5 h-5 text-mint" />
               <h2 className="font-display text-xl font-bold text-foreground">
-                8축 역량 분석
+                5축 핵심 역량 분석
               </h2>
             </div>
             <div className="grid md:grid-cols-2 gap-6">
@@ -470,31 +658,37 @@ export default function InterviewResultPage() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Competency List */}
+              {/* 5-Axis Category List */}
               <div className="space-y-3">
-                {Object.entries(result.competency_scores)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-3">
-                      <span className="text-sm text-muted-foreground w-20 truncate">
-                        {COMPETENCY_LABELS[key as keyof CompetencyScores]}
-                      </span>
-                      <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${value}%` }}
-                          transition={{ duration: 0.5, delay: 0.2 }}
-                          className={`h-full ${value >= 70 ? "bg-mint" : value >= 50 ? "bg-amber-500" : "bg-destructive"}`}
-                        />
+                {result.category_scores && Object.entries(result.category_scores)
+                  .sort(([, a], [, b]) => b.score - a.score)
+                  .map(([key, categoryScore]) => {
+                    const percentValue = Math.round(((categoryScore.score - 1) / 4) * 100);
+                    return (
+                      <div key={key} className="flex items-center gap-3">
+                        <span className="text-sm text-muted-foreground w-28 truncate">
+                          {CATEGORY_LABELS[key] || key}
+                        </span>
+                        <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${percentValue}%` }}
+                            transition={{ duration: 0.5, delay: 0.2 }}
+                            className={`h-full ${percentValue >= 70 ? "bg-mint" : percentValue >= 50 ? "bg-amber-500" : "bg-destructive"}`}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-foreground w-12 text-right">
+                          {categoryScore.score}/5
+                        </span>
                       </div>
-                      <span className="text-sm font-medium text-foreground w-8 text-right">{value}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           </div>
         </motion.div>
-      </div>
+        </div>
+      </BlurReveal>
 
       {/* Interviewer Feedback with Progress Bars */}
       <motion.div
@@ -563,6 +757,12 @@ export default function InterviewResultPage() {
                       {getFavorabilityLabel(score)}
                     </span>
                   </div>
+                  {/* Interviewer Comment */}
+                  {result.interviewer_comments?.[id] && (
+                    <p className="text-xs text-muted-foreground mt-3 italic border-t border-border/50 pt-3">
+                      &ldquo;{result.interviewer_comments[id]}&rdquo;
+                    </p>
+                  )}
                 </div>
               );
             })}

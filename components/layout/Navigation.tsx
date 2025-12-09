@@ -20,7 +20,7 @@ const navItems = [
   { label: "AI면접", href: "#interviewers" },
   { label: "분석", href: "#analytics" },
   { label: "보안", href: "#security" },
-  { label: "사례", href: "#case-study" },
+  { label: "리뷰", href: "#case-study" },
 ];
 
 export function Navigation() {

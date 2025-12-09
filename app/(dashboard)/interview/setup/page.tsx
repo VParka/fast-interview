@@ -200,6 +200,10 @@ export default function InterviewSetupPage() {
         // Store session data and navigate to interview
         sessionStorage.setItem("interviewSession", JSON.stringify(data.session));
         sessionStorage.setItem("firstMessage", JSON.stringify(data.first_message));
+        // Store interviewer names (random per session from DB)
+        if (data.interviewer_names) {
+          sessionStorage.setItem("interviewerNames", JSON.stringify(data.interviewer_names));
+        }
         router.push("/interview");
       } else {
         setError(data.error || "면접 시작 실패");

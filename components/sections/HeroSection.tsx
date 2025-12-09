@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Mic, Brain, BarChart3 } from "lucide-react";
-import Link from "next/link";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 // Voice wave component that only animates on client
 function VoiceWave() {
@@ -41,12 +42,39 @@ function VoiceWave() {
 }
 
 const features = [
-  { icon: Mic, label: "Real-time Voice" },
-  { icon: Brain, label: "8-Core Evaluation" },
-  { icon: BarChart3, label: "<2s Latency" },
+  { icon: Mic, label: "실시간 음성" },
+  { icon: Brain, label: "5축 핵심 역량 분석" },
+  { icon: BarChart3, label: "2초 미만 응답" },
 ];
 
 export function HeroSection() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const supabase = createBrowserSupabaseClient();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+    };
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session?.user);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  const handleTryNow = () => {
+    if (isAuthenticated) {
+      router.push("/interview");
+    } else {
+      router.push("/login?redirect=/interview");
+    }
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
       {/* Background Elements */}
@@ -122,22 +150,22 @@ export function HeroSection() {
             ))}
           </motion.div>
 
-          {/* CTA Buttons */}
+          {/* CTA Button */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.5 }}
-            className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4"
+            className="flex justify-center px-4"
           >
-            <Link href="/interview" className="w-full sm:w-auto">
-              <Button variant="hero" size="xl" className="group w-full sm:w-auto">
-                <Play className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
-                Try Demo
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </Link>
-            <Button variant="hero-outline" size="xl" className="w-full sm:w-auto">
-              View Case Study
+            <Button
+              variant="hero"
+              size="xl"
+              onClick={handleTryNow}
+              className="group px-12 sm:px-16 py-5 sm:py-6 text-lg sm:text-xl font-semibold"
+            >
+              <Play className="w-6 h-6 sm:w-7 sm:h-7 group-hover:scale-110 transition-transform" />
+              Try Now
+              <ArrowRight className="w-6 h-6 sm:w-7 sm:h-7 group-hover:translate-x-1 transition-transform" />
             </Button>
           </motion.div>
         </div>

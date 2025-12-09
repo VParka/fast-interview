@@ -13,13 +13,18 @@ import { generateInterviewerResponse, type ChatMessage, type UserKeyword } from 
 import { ragService } from '@/lib/rag/service';
 import { INTERVIEWER_BASE, type InterviewerType, type MBTIType } from '@/types/interview';
 
+// Maximum follow-up questions per topic before switching to new question
+const MAX_FOLLOW_UPS = 3;
+
 // Enhanced interviewer selection with follow-up probability
 // If same interviewer selected, high chance of follow-up question
 // If different interviewer, transform question or ask new one
+// Limits follow-ups to MAX_FOLLOW_UPS before forcing a new topic
 function selectNextInterviewer(
   currentId: InterviewerType,
-  turnCount: number
-): { nextId: InterviewerType; isFollowUp: boolean } {
+  turnCount: number,
+  consecutiveFollowUps: number = 0
+): { nextId: InterviewerType; isFollowUp: boolean; shouldForceNewTopic: boolean } {
   // Base weights for each interviewer
   const baseWeights = {
     hiring_manager: 0.4,
@@ -27,12 +32,29 @@ function selectNextInterviewer(
     senior_peer: 0.4,
   };
 
+  // Force new topic if we've hit the follow-up limit
+  if (consecutiveFollowUps >= MAX_FOLLOW_UPS) {
+    // Must switch interviewer and start new topic
+    const others = (Object.keys(baseWeights) as InterviewerType[]).filter(id => id !== currentId);
+    const totalWeight = others.reduce((sum, id) => sum + baseWeights[id], 0);
+    const random = Math.random() * totalWeight;
+    let cumulative = 0;
+
+    for (const id of others) {
+      cumulative += baseWeights[id];
+      if (random <= cumulative) {
+        return { nextId: id, isFollowUp: false, shouldForceNewTopic: true };
+      }
+    }
+    return { nextId: others[0], isFollowUp: false, shouldForceNewTopic: true };
+  }
+
   // Follow-up probability: same interviewer continues (higher early in interview)
   const followUpProbability = Math.max(0.3, 0.6 - (turnCount * 0.05)); // Starts at 55%, decreases
 
   // Decide if same interviewer should continue for follow-up
   if (Math.random() < followUpProbability) {
-    return { nextId: currentId, isFollowUp: true };
+    return { nextId: currentId, isFollowUp: true, shouldForceNewTopic: false };
   }
 
   // Select different interviewer
@@ -45,11 +67,11 @@ function selectNextInterviewer(
   for (const id of others) {
     cumulative += baseWeights[id];
     if (random <= cumulative) {
-      return { nextId: id, isFollowUp: false };
+      return { nextId: id, isFollowUp: false, shouldForceNewTopic: false };
     }
   }
 
-  return { nextId: others[0], isFollowUp: false };
+  return { nextId: others[0], isFollowUp: false, shouldForceNewTopic: false };
 }
 
 export async function POST(req: NextRequest) {
@@ -167,9 +189,20 @@ export async function POST(req: NextRequest) {
 
     // Select next interviewer with enhanced follow-up logic
     const currentInterviewerId = session.current_interviewer_id as InterviewerType || 'hiring_manager';
-    const { nextId: nextInterviewerId, isFollowUp } = selectNextInterviewer(
+
+    // Track consecutive follow-ups from session metadata
+    interface SessionMetadataExtended {
+      interviewer_mbti?: Record<InterviewerType, MBTIType>;
+      interviewer_names?: Record<InterviewerType, string>;
+      consecutive_follow_ups?: number;
+    }
+    const sessionMeta = (session.timer_config as unknown as SessionMetadataExtended) || {};
+    const consecutiveFollowUps = sessionMeta.consecutive_follow_ups || 0;
+
+    const { nextId: nextInterviewerId, isFollowUp, shouldForceNewTopic } = selectNextInterviewer(
       currentInterviewerId,
-      session.turn_count
+      session.turn_count,
+      consecutiveFollowUps
     );
     const interviewerBase = INTERVIEWER_BASE[nextInterviewerId];
 
@@ -252,7 +285,9 @@ export async function POST(req: NextRequest) {
         industry: session.industry || undefined,
         difficulty: session.difficulty as 'easy' | 'medium' | 'hard',
         turnCount: session.turn_count + 1,
-        previousInterviewerId: isFollowUp ? undefined : currentInterviewerId, // Pass previous for transition
+        // Pass previous interviewer only if NOT a follow-up (for question transition)
+        // If forced new topic, also indicate to generate completely new question
+        previousInterviewerId: (isFollowUp && !shouldForceNewTopic) ? undefined : currentInterviewerId,
         interviewerMbti,
       }
     );
@@ -286,7 +321,21 @@ export async function POST(req: NextRequest) {
     // Update session
     const newTurnCount = session.turn_count + 1;
     const shouldEnd = newTurnCount >= session.max_turns;
-    console.log('Updating session:', { newTurnCount, shouldEnd });
+
+    // Update consecutive follow-up count
+    const newConsecutiveFollowUps = isFollowUp ? consecutiveFollowUps + 1 : 0;
+    const updatedTimerConfig = {
+      ...sessionMeta,
+      consecutive_follow_ups: newConsecutiveFollowUps,
+    };
+
+    console.log('Updating session:', {
+      newTurnCount,
+      shouldEnd,
+      isFollowUp,
+      shouldForceNewTopic,
+      newConsecutiveFollowUps
+    });
 
     const { error: updateError } = await supabase
       .from('interview_sessions')
@@ -294,6 +343,7 @@ export async function POST(req: NextRequest) {
         turn_count: newTurnCount,
         current_interviewer_id: nextInterviewerId,
         status: shouldEnd ? 'completed' : 'active',
+        timer_config: updatedTimerConfig,
       })
       .eq('id', session_id);
 
