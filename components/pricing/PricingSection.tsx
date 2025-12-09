@@ -1,14 +1,11 @@
 "use client";
 
-"use client";
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { PricingCard } from "@/components/pricing/PricingCard";
 import { PlanSwitcher } from "@/components/pricing/PlanSwitcher";
 import { PLANS } from "@/lib/constants/pricing";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Database } from "@/lib/database.types";
 import { toast } from "sonner";
 import { PaymentModal } from "@/components/pricing/PaymentModal";
 
@@ -20,7 +17,7 @@ export function PricingSection() {
   const [userTier, setUserTier] = useState<string>("seed");
   const [userId, setUserId] = useState<string | null>(null);
 
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
