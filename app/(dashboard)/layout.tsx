@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -45,22 +46,50 @@ export default function DashboardLayout({
   const supabase = createBrowserSupabaseClient();
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      try {
+        // 1. 먼저 캐시된 세션 확인 (빠름)
+        const { data: { session } } = await supabase.auth.getSession();
 
-      if (authUser) {
-        // Get profile data
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", authUser.id)
-          .single() as { data: { full_name?: string } | null };
+        if (session?.user && isMounted) {
+          // 즉시 기본 정보로 UI 업데이트
+          setUser({
+            id: session.user.id,
+            email: session.user.email || "",
+            full_name: session.user.user_metadata?.full_name,
+          });
+        }
 
-        setUser({
-          id: authUser.id,
-          email: authUser.email || "",
-          full_name: profile?.full_name || authUser.user_metadata?.full_name,
-        });
+        // 2. 백그라운드에서 프로필 정보 가져오기 (3초 타임아웃)
+        if (session?.user) {
+          const profilePromise = supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", session.user.id)
+            .single();
+
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Profile fetch timeout')), 3000);
+          });
+
+          try {
+            const { data: profile } = await Promise.race([profilePromise, timeoutPromise]) as { data: { full_name?: string } | null };
+
+            if (isMounted && profile?.full_name) {
+              setUser(prev => prev ? {
+                ...prev,
+                full_name: profile.full_name,
+              } : null);
+            }
+          } catch (profileError) {
+            // 프로필 로드 실패해도 무시 - 이미 기본 정보는 표시됨
+            console.log('Profile fetch skipped:', profileError);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error);
       }
     };
 
@@ -68,27 +97,27 @@ export default function DashboardLayout({
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        if (!isMounted) return;
+
         if (event === "SIGNED_OUT") {
           setUser(null);
           window.location.href = "/login";
         } else if (session?.user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", session.user.id)
-            .single() as { data: { full_name?: string } | null };
-
+          // 즉시 기본 정보로 업데이트 (프로필 조회 없이)
           setUser({
             id: session.user.id,
             email: session.user.email || "",
-            full_name: profile?.full_name || session.user.user_metadata?.full_name,
+            full_name: session.user.user_metadata?.full_name,
           });
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -129,9 +158,13 @@ export default function DashboardLayout({
         {/* Logo */}
         <div className="p-6 border-b border-border/50">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-mint to-soft-blue flex items-center justify-center shadow-mint">
-              <span className="font-display font-bold text-navy text-lg">IM</span>
-            </div>
+            <Image
+              src="/app-icon-dark.png"
+              alt="IMSAM"
+              width={40}
+              height={40}
+              className="w-10 h-10 object-contain"
+            />
             <span className="font-display font-semibold text-xl text-foreground">
               IMSAM
             </span>

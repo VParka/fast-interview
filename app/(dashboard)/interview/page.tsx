@@ -686,7 +686,11 @@ export default function InterviewPage() {
                 마이크를 허용하고 면접을 시작해주세요.
               </p>
               <div className="flex justify-center gap-4">
-                <Button variant="outline" onClick={() => router.push("/interview/setup")} className="gap-2">
+                <Button
+                  size="xl"
+                  onClick={() => router.push("/interview/setup")}
+                  className="gap-2 bg-rose-600 hover:bg-rose-700 text-white shadow-none hover:shadow-[0_0_20px_rgba(225,29,72,0.4)] hover:scale-[1.02]"
+                >
                   설정 변경
                 </Button>
                 <Button variant="mint" size="xl" onClick={startInterview} className="gap-2">

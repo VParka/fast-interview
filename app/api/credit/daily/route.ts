@@ -6,9 +6,10 @@ import type { Database } from '@/types/database';
 const DAILY_REWARD_AMOUNT = Number(process.env.DAILY_REWARD_AMOUNT ?? 1000);
 const DAILY_MIN_INTERVAL_HOURS = Number(process.env.DAILY_REWARD_INTERVAL_HOURS ?? 24);
 
-export async function POST(_req: NextRequest) {
+async function createSupabaseServerClient() {
   const cookieStore = await cookies();
-  const supabase = createServerClient<Database>(
+
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -28,6 +29,10 @@ export async function POST(_req: NextRequest) {
       },
     }
   );
+}
+
+export async function POST(_req: NextRequest) {
+  const supabase = await createSupabaseServerClient();
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {

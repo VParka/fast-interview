@@ -101,7 +101,29 @@ export default function DashboardPage() {
   >([]);
 
   useEffect(() => {
-    fetchDashboardData();
+    let isMounted = true;
+
+    const loadData = async () => {
+      // 5초 타임아웃으로 빠른 실패 처리
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 5000);
+      });
+
+      try {
+        await Promise.race([fetchDashboardData(), timeoutPromise]);
+      } catch (error) {
+        console.error('Dashboard data load error:', error);
+        if (isMounted) {
+          setDemoData();
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const fetchDashboardData = async () => {
@@ -109,16 +131,18 @@ export default function DashboardPage() {
     try {
       const supabase = createBrowserSupabaseClient();
 
-      // Get current user
+      // 캐시된 세션 사용 (getUser보다 빠름)
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (!user) {
+      if (!session?.user) {
         // Use demo data if not logged in
         setDemoData();
         return;
       }
+
+      const user = session.user;
 
       // Fetch interview results with sessions
       const { data: results } = await supabase

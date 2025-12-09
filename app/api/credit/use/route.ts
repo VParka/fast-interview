@@ -3,9 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/types/database';
 
-export async function POST(req: NextRequest) {
+const DEFAULT_REASON = 'AI_USE';
+
+async function createSupabaseServerClient() {
   const cookieStore = await cookies();
-  const supabase = createServerClient<Database>(
+
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -26,6 +29,8 @@ export async function POST(req: NextRequest) {
     }
   );
 
+export async function POST(req: NextRequest) {
+  const supabase = await createSupabaseServerClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authData?.user) {

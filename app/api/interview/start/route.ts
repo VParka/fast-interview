@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       resume_doc_id,
       portfolio_doc_id,
       timer_config,
+      jd_text,
     } = body;
 
     // ============================================
@@ -82,6 +83,14 @@ export async function POST(req: NextRequest) {
     if (portfolio_doc_id && !isValidUUID(portfolio_doc_id)) {
       return NextResponse.json(
         { success: false, error: '유효하지 않은 포트폴리오 문서 ID입니다.' },
+        { status: 400 }
+      );
+    }
+
+    // Validate JD text (optional, max 5000 chars)
+    if (jd_text && (typeof jd_text !== 'string' || jd_text.length > 5000)) {
+      return NextResponse.json(
+        { success: false, error: '채용공고는 5000자 이내로 입력해주세요.' },
         { status: 400 }
       );
     }
@@ -268,6 +277,7 @@ export async function POST(req: NextRequest) {
       }),
       interviewer_mbti: interviewerMbti, // Store MBTI assignments
       interviewer_names: interviewerNames, // Store name assignments
+      jd_text: jd_text || null, // Store JD text
     };
 
     const { data: session, error: sessionError } = await supabase
@@ -389,6 +399,7 @@ export async function POST(req: NextRequest) {
           difficulty,
           turnCount: 1,
           interviewerMbti: firstInterviewerMbti,
+          jdText: jd_text || undefined,
         }
       );
       console.log('LLM response received, latency:', response.latencyMs, 'ms');

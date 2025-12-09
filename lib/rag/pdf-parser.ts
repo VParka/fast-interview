@@ -3,6 +3,8 @@
 // ============================================
 // Handles complex PDF layouts (tables, multi-column, images)
 
+import { PDFParse } from 'pdf-parse';
+
 export interface PDFParseResult {
   text: string;
   metadata: {
@@ -50,9 +52,9 @@ export async function parsePDFWithLlamaParse(
     }
   }
 
-  // Fallback to basic text extraction
-  console.log('[PDFParser] Using basic extraction');
-  return basicPDFParse(pdfBuffer, Date.now() - startTime);
+  // Fallback to basic text extraction using pdf-parse
+  console.log('[PDFParser] Using basic extraction with pdf-parse');
+  return await basicPDFParse(pdfBuffer, startTime);
 }
 
 /**
@@ -78,8 +80,8 @@ async function llamaParseRequest(
     formData.append('parsing_instruction', config.parsingInstructions);
   }
 
-  // LlamaParse API endpoint
-  const response = await fetch('https://api.cloud.llamaindex.ai/api/parsing/upload', {
+  // LlamaParse API endpoint (v1)
+  const response = await fetch('https://api.cloud.llamaindex.ai/api/v1/parsing/upload', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -120,7 +122,7 @@ async function pollLlamaParseJob(jobId: string, apiKey: string, maxAttempts: num
   const pollInterval = 2000; // 2 seconds
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetch(`https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}`, {
+    const response = await fetch(`https://api.cloud.llamaindex.ai/api/v1/parsing/job/${jobId}`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
       },
@@ -153,52 +155,71 @@ async function pollLlamaParseJob(jobId: string, apiKey: string, maxAttempts: num
 }
 
 /**
- * Basic PDF text extraction (fallback)
- * Handles simple PDFs without complex layouts
+ * Basic PDF text extraction using pdf-parse library (fallback)
+ * Handles most PDFs reliably
  */
-function basicPDFParse(pdfBuffer: Buffer, elapsedTime: number): PDFParseResult {
-  // Simple text extraction from PDF buffer
-  // This is a very basic implementation - in production you'd use pdf-parse or similar
-  let text = '';
+async function basicPDFParse(pdfBuffer: Buffer, startTime: number): Promise<PDFParseResult> {
+  let parser: InstanceType<typeof PDFParse> | null = null;
 
   try {
-    // Look for text content between BT/ET markers (PDF text objects)
-    const pdfContent = pdfBuffer.toString('latin1');
-    const textMatches = pdfContent.match(/\(([^)]+)\)/g);
+    console.log('[PDFParser] Using pdf-parse library for extraction...');
 
-    if (textMatches) {
-      text = textMatches
-        .map(match => match.slice(1, -1)) // Remove parentheses
-        .join(' ')
-        .replace(/\\n/g, '\n')
-        .replace(/\\r/g, '\r')
-        .replace(/\\/g, '')
-        .trim();
-    }
+    // Create PDF parser instance
+    parser = new PDFParse({
+      data: new Uint8Array(pdfBuffer),
+    });
 
-    // If no text found, try UTF-8 extraction
-    if (!text) {
-      text = pdfBuffer
-        .toString('utf-8')
-        .replace(/[\x00-\x1F\x7F]/g, ' ') // Remove control characters
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
+    // Extract text
+    const textResult = await parser.getText();
+
+    const text = textResult.text
+      .replace(/\0/g, '') // Remove null characters
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
+      .trim();
+
+    const pageCount = textResult.pages?.length || 1;
+    console.log(`[PDFParser] pdf-parse extracted ${text.length} chars from ${pageCount} pages`);
+
+    return {
+      text,
+      metadata: {
+        pages: pageCount,
+        hasImages: false,
+        hasTables: false,
+        parseMethod: 'basic',
+        parseTimeMs: Date.now() - startTime,
+      },
+    };
   } catch (error) {
-    console.error('[PDFParser] Basic parsing failed:', error);
-    text = pdfBuffer.toString('utf-8', 0, Math.min(10000, pdfBuffer.length));
-  }
+    console.error('[PDFParser] pdf-parse failed:', error);
 
-  return {
-    text,
-    metadata: {
-      pages: 1,
-      hasImages: false,
-      hasTables: false,
-      parseMethod: 'basic',
-      parseTimeMs: elapsedTime,
-    },
-  };
+    // Ultimate fallback - raw text extraction
+    const text = pdfBuffer
+      .toString('utf-8')
+      .replace(/[\x00-\x1F\x7F]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return {
+      text: text.slice(0, 50000), // Limit to 50k chars
+      metadata: {
+        pages: 1,
+        hasImages: false,
+        hasTables: false,
+        parseMethod: 'fallback',
+        parseTimeMs: Date.now() - startTime,
+      },
+    };
+  } finally {
+    // Clean up parser resources
+    if (parser) {
+      try {
+        await parser.destroy();
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
 }
 
 /**
@@ -220,12 +241,16 @@ export function shouldUseLlamaParse(pdfBuffer: Buffer): boolean {
 }
 
 /**
- * Utility function with auto-detection
+ * Smart PDF parser with auto-detection
+ * - Uses LlamaParse for complex PDFs (tables, images, multi-column)
+ * - Falls back to pdf-parse for simple PDFs
  */
 export async function smartParsePDF(pdfBuffer: Buffer, llamaParseApiKey?: string): Promise<PDFParseResult> {
-  const useAdvanced = shouldUseLlamaParse(pdfBuffer) && llamaParseApiKey;
+  const startTime = Date.now();
+  const hasComplexLayout = shouldUseLlamaParse(pdfBuffer);
 
-  if (useAdvanced) {
+  // Use LlamaParse for complex PDFs if API key available
+  if (hasComplexLayout && llamaParseApiKey) {
     console.log('[PDFParser] Complex layout detected, using LlamaParse');
     return parsePDFWithLlamaParse(pdfBuffer, {
       apiKey: llamaParseApiKey,
@@ -235,6 +260,7 @@ export async function smartParsePDF(pdfBuffer: Buffer, llamaParseApiKey?: string
     });
   }
 
-  console.log('[PDFParser] Simple layout, using basic extraction');
-  return parsePDFWithLlamaParse(pdfBuffer);
+  // Use pdf-parse for simple PDFs or when LlamaParse unavailable
+  console.log('[PDFParser] Using pdf-parse for extraction');
+  return await basicPDFParse(pdfBuffer, startTime);
 }
