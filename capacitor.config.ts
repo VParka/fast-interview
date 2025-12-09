@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
   webDir: 'public',  // Capacitor에서 필요하지만 server.url 사용 시 무시됨
   server: {
     // 프로덕션 웹서버 URL (Vercel 배포 주소)
-    url: isProd ? 'https://www.aiiv.site' : 'http://localhost:3000',
+    url: isProd ? 'https://aiiv.site' : 'http://localhost:3000',
     cleartext: !isProd,  // 개발 시 HTTP 허용
   },
   ios: {
