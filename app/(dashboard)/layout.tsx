@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -176,9 +177,13 @@ export default function DashboardLayout({
         {/* Logo */}
         <div className="p-6 border-b border-border/50">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-mint to-soft-blue flex items-center justify-center shadow-mint">
-              <span className="font-display font-bold text-navy text-lg">IM</span>
-            </div>
+            <Image
+              src="/app-icon-dark.png"
+              alt="IMSAM"
+              width={40}
+              height={40}
+              className="w-10 h-10 object-contain"
+            />
             <span className="font-display font-semibold text-xl text-foreground">
               IMSAM
             </span>
