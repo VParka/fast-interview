@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getUsers, updateUserRole, updateUserStatus, grantCredits, sendEmail } from "@/lib/admin/api";
+import { updateUserRole, updateUserStatus, grantCredits, sendEmail } from "@/lib/admin/api";
 import type { AdminUser, PaginatedResponse } from "@/types/admin";
 import { toast } from "sonner";
 
@@ -59,11 +59,15 @@ export default function AdminUsersPage() {
   const loadUsers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getUsers({
-        page: currentPage,
-        limit,
-        search: searchQuery || undefined,
+      // API Route를 통해 전체 유저 조회 (RLS 우회)
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: limit.toString(),
+        ...(searchQuery && { search: searchQuery }),
       });
+      const res = await fetch(`/api/admin/users?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setUsers(data);
     } catch (error) {
       console.error("Failed to load users:", error);
