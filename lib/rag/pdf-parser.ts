@@ -3,7 +3,10 @@
 // ============================================
 // Handles complex PDF layouts (tables, multi-column, images)
 
-import { PDFParse } from 'pdf-parse';
+// pdf-parse v2 uses class-based API with require
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParseModule = require('pdf-parse');
+const PDFParse = pdfParseModule.PDFParse || pdfParseModule.default?.PDFParse || pdfParseModule;
 
 export interface PDFParseResult {
   text: string;
@@ -159,37 +162,68 @@ async function pollLlamaParseJob(jobId: string, apiKey: string, maxAttempts: num
  * Handles most PDFs reliably
  */
 async function basicPDFParse(pdfBuffer: Buffer, startTime: number): Promise<PDFParseResult> {
-  let parser: InstanceType<typeof PDFParse> | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parser: any = null;
 
   try {
     console.log('[PDFParser] Using pdf-parse library for extraction...');
 
-    // Create PDF parser instance
-    parser = new PDFParse({
-      data: new Uint8Array(pdfBuffer),
-    });
+    // Try pdf-parse v2 class-based API first
+    if (typeof PDFParse === 'function' && PDFParse.prototype) {
+      try {
+        parser = new PDFParse({
+          data: new Uint8Array(pdfBuffer),
+        });
+        const textResult = await parser.getText();
+        await parser.destroy();
 
-    // Extract text
-    const textResult = await parser.getText();
+        const text = (textResult.text || '')
+          .replace(/\0/g, '')
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+          .trim();
 
-    const text = textResult.text
-      .replace(/\0/g, '') // Remove null characters
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
-      .trim();
+        const pageCount = textResult.pages?.length || 1;
+        console.log(`[PDFParser] pdf-parse v2 extracted ${text.length} chars from ${pageCount} pages`);
 
-    const pageCount = textResult.pages?.length || 1;
-    console.log(`[PDFParser] pdf-parse extracted ${text.length} chars from ${pageCount} pages`);
+        return {
+          text,
+          metadata: {
+            pages: pageCount,
+            hasImages: false,
+            hasTables: false,
+            parseMethod: 'basic',
+            parseTimeMs: Date.now() - startTime,
+          },
+        };
+      } catch (v2Error) {
+        console.warn('[PDFParser] pdf-parse v2 API failed, trying v1:', v2Error);
+      }
+    }
 
-    return {
-      text,
-      metadata: {
-        pages: pageCount,
-        hasImages: false,
-        hasTables: false,
-        parseMethod: 'basic',
-        parseTimeMs: Date.now() - startTime,
-      },
-    };
+    // Try pdf-parse v1 function-based API
+    const pdfParse = pdfParseModule.default || pdfParseModule;
+    if (typeof pdfParse === 'function') {
+      const result = await pdfParse(pdfBuffer);
+      const text = (result.text || '')
+        .replace(/\0/g, '')
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        .trim();
+
+      console.log(`[PDFParser] pdf-parse v1 extracted ${text.length} chars from ${result.numpages} pages`);
+
+      return {
+        text,
+        metadata: {
+          pages: result.numpages || 1,
+          hasImages: false,
+          hasTables: false,
+          parseMethod: 'basic',
+          parseTimeMs: Date.now() - startTime,
+        },
+      };
+    }
+
+    throw new Error('No valid pdf-parse API found');
   } catch (error) {
     console.error('[PDFParser] pdf-parse failed:', error);
 
@@ -210,15 +244,6 @@ async function basicPDFParse(pdfBuffer: Buffer, startTime: number): Promise<PDFP
         parseTimeMs: Date.now() - startTime,
       },
     };
-  } finally {
-    // Clean up parser resources
-    if (parser) {
-      try {
-        await parser.destroy();
-      } catch {
-        // Ignore cleanup errors
-      }
-    }
   }
 }
 
