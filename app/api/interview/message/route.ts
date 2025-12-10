@@ -12,7 +12,8 @@ import { cookies } from 'next/headers';
 import * as Sentry from '@sentry/nextjs';
 import { generateInterviewerResponse, type ChatMessage, type UserKeyword } from '@/lib/llm/router';
 import { ragService } from '@/lib/rag/service';
-import { INTERVIEWER_BASE, type InterviewerType, type MBTIType } from '@/types/interview';
+import { searchRelevantQuestions } from '@/lib/rag/question-service';
+import { INTERVIEWER_BASE, type InterviewerType, type MBTIType, type JobCategory, type InterviewQuestionSearchResult } from '@/types/interview';
 
 // Maximum follow-up questions per topic before switching to new question
 const MAX_FOLLOW_UPS = 3;
@@ -276,7 +277,71 @@ export async function POST(req: NextRequest) {
       console.warn('Failed to load user keywords:', e);
     }
 
-    // Generate interviewer response with RAG context, keywords, and follow-up logic
+    // Search for relevant interview questions from question bank
+    let relevantQuestions: InterviewQuestionSearchResult[] = [];
+    try {
+      // Map job_categories (26개) to JobCategory (5개 기출문제 카테고리)
+      // legal, finance는 별도 카테고리로 기출문제 없음 → 매핑 제외
+      const jobCategoryMap: Record<string, JobCategory> = {
+        // Frontend 계열
+        'frontend': 'frontend',
+        'fullstack': 'frontend',
+        'mobile': 'frontend',
+        'embedded': 'frontend',
+        'ui_designer': 'frontend',
+        'ux_designer': 'frontend',
+        // Backend 계열
+        'backend': 'backend',
+        'devops': 'backend',
+        'security': 'backend',
+        'qa': 'backend',
+        // PM 계열
+        'pm': 'pm',
+        'po': 'pm',
+        'business_dev': 'pm',
+        'customer_success': 'pm',
+        // Data 계열
+        'data_scientist': 'data',
+        'data_analyst': 'data',
+        'data_engineer': 'data',
+        'ml_engineer': 'data',
+        'ai_researcher': 'data',
+        // Marketing 계열
+        'growth_marketer': 'marketing',
+        'content_marketer': 'marketing',
+        'sales': 'marketing',
+        // 별도 카테고리 (기출문제 없음): legal, finance, hr
+      };
+      const jobCategory = jobCategoryMap[session.job_type] as JobCategory | undefined;
+
+      // Skip search if job category has no matching question bank (e.g., legal, finance)
+      if (jobCategory) {
+        // Build search query from context
+        const resumeText = context || '';
+        const keywordTexts = userKeywords.map(k => k.keyword);
+
+        relevantQuestions = await searchRelevantQuestions(
+          resumeText,
+          jdText || '',
+          keywordTexts,
+          jobCategory,
+          {
+            topK: 3,
+            useReranker: true,
+          }
+        );
+
+        if (relevantQuestions.length > 0) {
+          console.log(`Found ${relevantQuestions.length} relevant questions for ${jobCategory}`);
+        }
+      } else {
+        console.log(`No question bank for job_type: ${session.job_type}, skipping question search`);
+      }
+    } catch (e) {
+      console.warn('Failed to search relevant questions:', e);
+    }
+
+    // Generate interviewer response with RAG context, keywords, relevant questions, and follow-up logic
     const llmResponse = await generateInterviewerResponse(
       conversationHistory,
       nextInterviewerId,
@@ -293,6 +358,7 @@ export async function POST(req: NextRequest) {
         previousInterviewerId: (isFollowUp && !shouldForceNewTopic) ? undefined : currentInterviewerId,
         interviewerMbti,
         jdText: jdText || undefined,
+        relevantQuestions: relevantQuestions.length > 0 ? relevantQuestions : undefined,
       }
     );
     console.log('LLM response generated:', {

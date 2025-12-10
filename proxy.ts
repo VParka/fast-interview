@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // TEST_MODE가 활성화되어 있으면 인증 체크를 우회
   const TEST_MODE = process.env.TEST_MODE === "true";
   

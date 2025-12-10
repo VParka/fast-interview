@@ -10,6 +10,7 @@ import {
   type InterviewerType,
   type StructuredResponse,
   type MBTIType,
+  type InterviewQuestionSearchResult,
 } from '@/types/interview';
 
 const openai = new OpenAI({
@@ -33,6 +34,7 @@ export interface LLMRequest {
   previousInterviewerId?: InterviewerType; // For follow-up logic
   interviewerMbti?: MBTIType; // Pre-assigned MBTI for the session
   jdText?: string; // Job description for targeted questions
+  relevantQuestions?: InterviewQuestionSearchResult[]; // RAG-retrieved interview questions
 }
 
 // User keyword from previous interviews
@@ -112,7 +114,8 @@ export class LLMRouter {
       request.turnCount,
       request.previousInterviewerId,
       request.interviewerId,
-      request.jdText
+      request.jdText,
+      request.relevantQuestions
     );
 
     // Limit conversation history to last 3 turns (6 messages: 3 user + 3 assistant)
@@ -170,7 +173,8 @@ export class LLMRouter {
     turnCount?: number,
     previousInterviewerId?: InterviewerType,
     currentInterviewerId?: InterviewerType,
-    jdText?: string
+    jdText?: string,
+    relevantQuestions?: InterviewQuestionSearchResult[]
   ): string {
     let prompt = basePrompt;
 
@@ -184,6 +188,19 @@ export class LLMRouter {
 ${jdText}
 
 → JD 요구사항 충족 여부를 검증하는 질문을 우선하세요.`;
+    }
+
+    // Add relevant interview questions from question bank
+    if (relevantQuestions && relevantQuestions.length > 0) {
+      prompt += `
+
+## 참고 기출문제 (해당 직무 관련)
+아래 기출문제들을 참고하여 유사한 방식으로 질문하세요:
+
+${relevantQuestions.map((q, i) => `${i + 1}. [${q.question_category}] ${q.question}${q.source_company ? ` (출처: ${q.source_company})` : ''}`).join('\n')}
+
+→ 이 기출문제들을 그대로 사용하지 말고, 지원자의 경험에 맞게 변형하여 질문하세요.
+→ 지원자의 이력서/포트폴리오 내용과 연결하여 질문하면 더 좋습니다.`;
     }
 
     // Add difficulty context
@@ -375,6 +392,7 @@ export async function generateInterviewerResponse(
     previousInterviewerId?: InterviewerType;
     interviewerMbti?: MBTIType;
     jdText?: string;
+    relevantQuestions?: InterviewQuestionSearchResult[];
   }
 ): Promise<LLMResponse> {
   return llmRouter.generateResponse({

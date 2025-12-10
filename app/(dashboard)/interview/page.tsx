@@ -500,16 +500,40 @@ export default function InterviewPage() {
       return;
     }
 
-    // Just mark session as abandoned, no score calculation
+    // Calculate elapsed time (in seconds)
+    const elapsedTime = INTERVIEW_TIME_LIMIT - timeRemaining;
+    const MINIMUM_INTERVIEW_TIME = 300; // 5 minutes in seconds
+
     try {
       const { createBrowserSupabaseClient } = await import("@/lib/supabase/client");
       const supabase = createBrowserSupabaseClient();
-      await (supabase
-        .from("interview_sessions") as ReturnType<typeof supabase.from>)
-        .update({ status: "abandoned" } as Record<string, unknown>)
-        .eq("id", sessionId);
+
+      if (elapsedTime < MINIMUM_INTERVIEW_TIME) {
+        // Less than 5 minutes - delete session and messages completely
+        // Delete messages first (foreign key constraint)
+        await supabase
+          .from("messages")
+          .delete()
+          .eq("session_id", sessionId);
+
+        // Delete session
+        await supabase
+          .from("interview_sessions")
+          .delete()
+          .eq("id", sessionId);
+
+        console.log("Interview session deleted (duration < 5 minutes)");
+      } else {
+        // 5 minutes or more - just mark as abandoned
+        await (supabase
+          .from("interview_sessions") as ReturnType<typeof supabase.from>)
+          .update({ status: "abandoned" } as Record<string, unknown>)
+          .eq("id", sessionId);
+
+        console.log("Interview session marked as abandoned");
+      }
     } catch (err) {
-      console.error("Failed to mark session as abandoned:", err);
+      console.error("Failed to handle session exit:", err);
     }
 
     // Navigate back to dashboard without saving results

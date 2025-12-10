@@ -352,6 +352,31 @@ export interface Document {
   created_at: string;
 }
 
+// Interview Question (from PDF question bank)
+export type JobCategory = 'frontend' | 'backend' | 'pm' | 'data' | 'marketing';
+
+export interface InterviewQuestion {
+  id: string;
+  job_category: JobCategory;
+  question_category: string;  // '개발경험', 'CS', 'React', '직무역량' 등
+  question: string;
+  source_company?: string;
+  embedding?: number[];
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+}
+
+export interface InterviewQuestionSearchResult {
+  id: string;
+  question: string;
+  question_category: string;
+  job_category: string;
+  source_company?: string;
+  combined_score: number;
+  vector_score: number;
+  bm25_score: number;
+}
+
 // Interview Result (8-Axis Competency)
 export interface InterviewResult {
   id: string;
