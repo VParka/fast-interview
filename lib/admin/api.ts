@@ -127,9 +127,10 @@ export async function getUsers(params: PaginationParams): Promise<PaginatedRespo
   const { page, limit, search, filter } = params;
   const offset = (page - 1) * limit;
   
+  // credits 조인을 left join으로 변경 (credits가 없는 유저도 표시)
   let query = supabase
     .from("profiles")
-    .select("*, credits(current_credits, total_earned, total_used)", { count: "exact" });
+    .select("*", { count: "exact" });
   
   // 검색
   if (search) {
@@ -146,26 +147,44 @@ export async function getUsers(params: PaginationParams): Promise<PaginatedRespo
   
   const { data, count, error } = await query;
   
-  if (error) throw error;
+  if (error) {
+    console.error("getUsers error:", error);
+    throw error;
+  }
   
+  // 각 유저의 크레딧 정보 별도 조회
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const users: AdminUser[] = ((data || []) as any[]).map((profile) => {
-    const creditArr = profile.credits;
-    return {
-      id: profile.id,
-      email: profile.email,
-      full_name: profile.full_name,
-      avatar_url: profile.avatar_url,
-      job_type: profile.job_type,
-      industry: profile.industry,
-      tier: profile.tier || null,
-      role: profile.role || "user",
-      status: "active",
-      created_at: profile.created_at,
-      updated_at: profile.updated_at,
-      credits: Array.isArray(creditArr) ? creditArr[0] : creditArr,
-    };
+  const profiles = (data || []) as any[];
+  
+  // 유저 ID로 크레딧 조회
+  const userIds = profiles.map(p => p.id);
+  const { data: creditsData } = await supabase
+    .from("credits")
+    .select("user_id, current_credits, total_earned, total_used")
+    .in("user_id", userIds);
+  
+  // 크레딧 맵 생성
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const creditsMap = new Map<string, any>();
+  (creditsData || []).forEach((c) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    creditsMap.set((c as any).user_id, c);
   });
+  
+  const users: AdminUser[] = profiles.map((profile) => ({
+    id: profile.id,
+    email: profile.email,
+    full_name: profile.full_name,
+    avatar_url: profile.avatar_url,
+    job_type: profile.job_type,
+    industry: profile.industry,
+    tier: profile.tier || null,
+    role: profile.role || "user",
+    status: profile.status || "active",
+    created_at: profile.created_at,
+    updated_at: profile.updated_at,
+    credits: creditsMap.get(profile.id) || null,
+  }));
   
   return {
     data: users,
@@ -215,6 +234,7 @@ export async function getSessionLogs(params: PaginationParams & {
   const { page, limit, search, startDate, endDate } = params;
   const offset = (page - 1) * limit;
   
+  // profiles 조인 제거하고 별도 조회
   let query = supabase
     .from("interview_sessions")
     .select(`
@@ -226,8 +246,7 @@ export async function getSessionLogs(params: PaginationParams & {
       status,
       turn_count,
       created_at,
-      updated_at,
-      profiles!inner(email)
+      updated_at
     `, { count: "exact" });
   
   // 날짜 필터
@@ -238,27 +257,40 @@ export async function getSessionLogs(params: PaginationParams & {
     query = query.lte("created_at", endDate);
   }
   
-  // 검색 (이메일 기준)
-  if (search) {
-    query = query.ilike("profiles.email", `%${search}%`);
-  }
-  
   query = query.range(offset, offset + limit - 1).order("created_at", { ascending: false });
   
   const { data, count, error } = await query;
   
-  if (error) throw error;
+  if (error) {
+    console.error("getSessionLogs error:", error);
+    throw error;
+  }
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const logs: SessionLog[] = ((data || []) as any[]).map((session) => ({
+  const sessions = (data || []) as any[];
+  
+  // 유저 이메일 별도 조회
+  const userIds = [...new Set(sessions.map(s => s.user_id))];
+  const { data: profilesData } = await supabase
+    .from("profiles")
+    .select("id, email")
+    .in("id", userIds);
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const emailMap = new Map<string, string>();
+  (profilesData || []).forEach((p: any) => {
+    emailMap.set(p.id, p.email);
+  });
+  
+  const logs: SessionLog[] = sessions.map((session) => ({
     id: session.id,
     user_id: session.user_id,
-    user_email: session.profiles?.email || "",
-    job_type: session.job_type,
+    user_email: emailMap.get(session.user_id) || "알 수 없음",
+    job_type: session.job_type || "미지정",
     industry: session.industry,
-    difficulty: session.difficulty,
-    status: session.status,
-    turn_count: session.turn_count,
+    difficulty: session.difficulty || "medium",
+    status: session.status || "waiting",
+    turn_count: session.turn_count || 0,
     created_at: session.created_at,
     completed_at: session.status === "completed" ? session.updated_at : null,
   }));
@@ -459,41 +491,74 @@ export interface CreditTransaction {
 
 export async function getCreditTransactions(params: PaginationParams): Promise<PaginatedResponse<CreditTransaction>> {
   const supabase = createBrowserSupabaseClient();
-  const { page, limit, search } = params;
+  const { page, limit } = params;
   const offset = (page - 1) * limit;
   
-  let query = supabase
-    .from("credit_transactions")
-    .select("*, profiles!inner(email)", { count: "exact" });
-  
-  if (search) {
-    query = query.ilike("profiles.email", `%${search}%`);
+  try {
+    // credit_transactions 테이블 조회 (테이블이 없을 수 있음)
+    let query = supabase
+      .from("credit_transactions")
+      .select("*", { count: "exact" });
+    
+    query = query.range(offset, offset + limit - 1).order("created_at", { ascending: false });
+    
+    const { data, count, error } = await query;
+    
+    if (error) {
+      console.error("getCreditTransactions error:", error);
+      // 테이블이 없으면 빈 결과 반환
+      return {
+        data: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+      };
+    }
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const txs = (data || []) as any[];
+    
+    // 유저 이메일 별도 조회
+    const userIds = [...new Set(txs.map(t => t.user_id))];
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .in("id", userIds);
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const emailMap = new Map<string, string>();
+    (profilesData || []).forEach((p: any) => {
+      emailMap.set(p.id, p.email);
+    });
+    
+    const transactions: CreditTransaction[] = txs.map((tx) => ({
+      id: tx.id,
+      user_id: tx.user_id,
+      user_email: emailMap.get(tx.user_id) || "알 수 없음",
+      amount: tx.amount,
+      reason: tx.reason || "내역 없음",
+      balance_after: tx.balance_after,
+      created_at: tx.created_at,
+    }));
+    
+    return {
+      data: transactions,
+      total: count || 0,
+      page,
+      limit,
+      totalPages: Math.ceil((count || 0) / limit),
+    };
+  } catch (err) {
+    console.error("getCreditTransactions failed:", err);
+    return {
+      data: [],
+      total: 0,
+      page,
+      limit,
+      totalPages: 0,
+    };
   }
-  
-  query = query.range(offset, offset + limit - 1).order("created_at", { ascending: false });
-  
-  const { data, count, error } = await query;
-  
-  if (error) throw error;
-  
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const transactions: CreditTransaction[] = ((data || []) as any[]).map((tx) => ({
-    id: tx.id,
-    user_id: tx.user_id,
-    user_email: tx.profiles?.email || "",
-    amount: tx.amount,
-    reason: tx.reason,
-    balance_after: tx.balance_after,
-    created_at: tx.created_at,
-  }));
-  
-  return {
-    data: transactions,
-    total: count || 0,
-    page,
-    limit,
-    totalPages: Math.ceil((count || 0) / limit),
-  };
 }
 
 // ============================================
