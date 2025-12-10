@@ -21,6 +21,8 @@
     "db:migrate:list": "supabase migration list --linked",
     "db:reset": "supabase db reset --linked",
     "db:types": "supabase gen types typescript --linked > types/supabase.ts",
+    "seed:questions": "npx ts-node --project tsconfig.node.json scripts/seed-interview-questions.ts",
+    "seed:questions:clear": "npx ts-node --project tsconfig.node.json scripts/seed-interview-questions.ts --clear",
     "functions:serve": "supabase functions serve --env-file .env.local",
     "functions:deploy": "supabase functions deploy --linked",
     "functions:deploy:auto-score": "supabase functions deploy auto-score --linked",
